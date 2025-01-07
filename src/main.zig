@@ -1,0 +1,31 @@
+const std = @import("std");
+const SGR = @import("./sgr.zig");
+
+pub fn main() !void {
+    std.debug.print("{s}: {s}!\n", .{
+        SGR.format("Test", &.{
+            .{ .Attribute = .Double_Underline },
+            .{ .Color = .{ .Underline = .{ .@"24bit" = .{ .r = 30, .g = 255, .b = 120 } } } },
+        }, &.{
+            .{ .Attribute = .Not_Underlined },
+            .{ .Attribute = .Default_Underline_Color },
+        }),
+        SGR.format(std.fmt.comptimePrint("{s} {s}", .{
+            SGR.format("Hello", &.{
+                .{ .Color = .{ .Foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
+            }, &.{
+                .{ .Attribute = .Default_Foreground_Color },
+            }),
+            SGR.format("World", &.{
+                .{ .Attribute = .Bold },
+                .{ .Color = .{ .Foreground = .{ .@"8bit" = 33 } } },
+            }, &.{
+                .{ .Attribute = .Not_Bold_Or_Dim },
+                .{ .Attribute = .Default_Foreground_Color },
+            }),
+        }), &.{.{ .Color = .{ .Background = .{ .Normal = .Black } } }}, &.{.{ .Attribute = .Default_Background_Color }}),
+    });
+
+    const str = SGR.Parser.parse("<du><u:30,255,120>Test<r><r>: <b:black><f:255,0,239>Hello<r> <f:33>World<r><r>!");
+    std.debug.print("{s}\n", .{str});
+}
