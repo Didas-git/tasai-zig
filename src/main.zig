@@ -1,5 +1,6 @@
 const std = @import("std");
 const SGR = @import("./sgr.zig");
+const hyperlink = @import("./osc.zig").hyperlink;
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
@@ -28,4 +29,8 @@ pub fn main() !void {
 
     const str = SGR.Parser.parse("<du><u:30,255,120>Test<r><r>: <b:black><f:255,0,239>Hello<r> <f:33>World<r><r>!");
     std.debug.print("{s}\n", .{str});
+
+    std.debug.print("{s}\n", .{hyperlink("My link", "https://google.com/", null)});
+    const Params = struct { id: u8 };
+    std.debug.print("{s}\n", .{hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
 }
