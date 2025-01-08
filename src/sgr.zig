@@ -13,7 +13,7 @@ pub const SGRAttribute = enum(u8) {
     Slow_Blink,
     Rapid_Blink,
     // Invert foreground and background colors
-    Revert,
+    Invert,
     Hide,
     Strike_Through,
     Default_Font,
@@ -34,7 +34,7 @@ pub const SGRAttribute = enum(u8) {
     Not_Underlined,
     Not_Blinking,
     Proportional_Spacing,
-    Not_Reversed,
+    Not_Inverted,
     Reveal,
     Not_Crossed_Out,
     Foreground_Black,
@@ -217,7 +217,7 @@ const BackgroundColors = CreateAvailableColors(10);
 ///     - `s` - Strike through (crossed)
 ///     - `o` - Overlined
 ///     - `du` - Double Underline
-///     - `inv` - Inverse (reverse)
+///     - `inv` - Invert
 /// - Colors:
 ///     - `f:<color>` - 3bit & 4bit Foreground Coloring (prefix with `b` for bright colors) ex: `f:bRed`, `f:blue`
 ///     - `f:n` - 8bit (0 - 255) Foreground Coloring
@@ -288,7 +288,7 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                     },
                     's' => {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Crossed_Out});
-                        appendAttribute(&final_text, .Crossed, previous_is_token);
+                        appendAttribute(&final_text, .Strike_Through, previous_is_token);
                     },
                     'o' => {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Overlined});
@@ -305,7 +305,7 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         else
                             final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)});
                     } else if (mem.eql(u8, token, "inv")) {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Reversed});
+                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Inverted});
                         appendAttribute(&final_text, .Invert, previous_is_token);
                     } else if (token[0] == 'f') {
                         // Skip `f` and `:`
