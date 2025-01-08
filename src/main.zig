@@ -1,7 +1,6 @@
 const std = @import("std");
-
-pub const SGR = @import("./sgr.zig");
-pub const hyperlink = @import("./osc.zig").hyperlink;
+const SGR = @import("./sgr.zig");
+const hyperlink = @import("./osc.zig").hyperlink;
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
