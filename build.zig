@@ -26,6 +26,17 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    // https://kristoff.it/blog/improving-your-zls-experience/
+    const exe_check = b.addExecutable(.{
+        .name = "tasai",
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const check = b.step("check", "Check if foo compiles");
+    check.dependOn(&exe_check.step);
+
     // const tests = b.addTest(.{
     //     .root_source_file = b.path("src/main.zig"),
     //     .target = target,

@@ -5,26 +5,26 @@ const hyperlink = @import("./osc.zig").hyperlink;
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
         SGR.verboseFormat("Test", &.{
-            .{ .Attribute = .Double_Underline },
-            .{ .Color = .{ .Underline = .{ .@"24bit" = .{ .r = 30, .g = 255, .b = 120 } } } },
+            .{ .attribute = .Double_Underline },
+            .{ .color = .{ .underline = .{ .@"24bit" = .{ .r = 30, .g = 255, .b = 120 } } } },
         }, &.{
-            .{ .Attribute = .Not_Underlined },
-            .{ .Attribute = .Default_Underline_Color },
+            .{ .attribute = .Not_Underlined },
+            .{ .attribute = .Default_Underline_Color },
         }),
         SGR.verboseFormat(std.fmt.comptimePrint("{s} {s}", .{
             SGR.verboseFormat("Hello", &.{
-                .{ .Color = .{ .Foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
+                .{ .color = .{ .foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
             }, &.{
-                .{ .Attribute = .Default_Foreground_Color },
+                .{ .attribute = .Default_Foreground_Color },
             }),
             SGR.verboseFormat("World", &.{
-                .{ .Attribute = .Bold },
-                .{ .Color = .{ .Foreground = .{ .@"8bit" = 33 } } },
+                .{ .attribute = .Bold },
+                .{ .color = .{ .foreground = .{ .@"8bit" = 33 } } },
             }, &.{
-                .{ .Attribute = .Not_Bold_Or_Dim },
-                .{ .Attribute = .Default_Foreground_Color },
+                .{ .attribute = .Not_Bold_Or_Dim },
+                .{ .attribute = .Default_Foreground_Color },
             }),
-        }), &.{.{ .Color = .{ .Background = .{ .Normal = .Black } } }}, &.{.{ .Attribute = .Default_Background_Color }}),
+        }), &.{.{ .color = .{ .background = .{ .normal = .Black } } }}, &.{.{ .attribute = .Default_Background_Color }}),
     });
 
     const str = SGR.parseString("<du><u:30,255,120>Test<r><r>: <b:black><f:#ff00ef>Hello<r> <f:33><b>World<r><r><r>!");

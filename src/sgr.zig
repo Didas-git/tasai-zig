@@ -12,9 +12,10 @@ pub const SGRAttribute = enum(u8) {
     Underline,
     Slow_Blink,
     Rapid_Blink,
-    Invert,
+    // Invert foreground and background colors
+    Revert,
     Hide,
-    Crossed,
+    Strike_Through,
     Default_Font,
     Font_1,
     Font_2,
@@ -97,25 +98,25 @@ pub const SGRAttribute = enum(u8) {
 };
 
 pub const SGRModifier = union(enum) {
-    Color: union(enum) { Foreground: union(enum) {
+    color: union(enum) { foreground: union(enum) {
         @"8bit": u8,
         @"24bit": struct {
             r: u8,
             g: u8,
             b: u8,
         },
-        Normal: enum(u8) { Black = 30, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-        Bright: enum(u8) { Black = 90, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-    }, Background: union(enum) {
+        normal: enum(u8) { Black = 30, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+        bright: enum(u8) { Black = 90, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+    }, background: union(enum) {
         @"8bit": u8,
         @"24bit": struct {
             r: u8,
             g: u8,
             b: u8,
         },
-        Normal: enum(u8) { Black = 40, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-        Bright: enum(u8) { Black = 100, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-    }, Underline: union(enum) {
+        normal: enum(u8) { Black = 40, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+        bright: enum(u8) { Black = 100, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+    }, underline: union(enum) {
         @"8bit": u8,
         @"24bit": struct {
             r: u8,
@@ -123,7 +124,7 @@ pub const SGRModifier = union(enum) {
             b: u8,
         },
     } },
-    Attribute: SGRAttribute,
+    attribute: SGRAttribute,
 };
 
 pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifiers: []const SGRModifier, comptime closing_modifiers: []const SGRModifier) []const u8 {
@@ -145,22 +146,22 @@ pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifier
 fn parseModifiers(buff: *[]const u8, modifiers: []const SGRModifier) void {
     for (modifiers) |attribute| {
         switch (attribute) {
-            .Attribute => |att| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(att)}),
-            .Color => |apply_to| switch (apply_to) {
-                .Foreground => |foreground| switch (foreground) {
-                    .Normal => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
-                    .Bright => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
+            .attribute => |att| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(att)}),
+            .color => |apply_to| switch (apply_to) {
+                .foreground => |foreground| switch (foreground) {
+                    .normal => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
+                    .bright => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
                     .@"8bit" => |color_code| buff.* = buff.* ++ fmt.comptimePrint("38;5;{d};", .{color_code}),
                     .@"24bit" => |color| buff.* = buff.* ++ fmt.comptimePrint("38;2;{d};{d};{d};", .{ color.r, color.g, color.b }),
                 },
                 // There is probably a way to avoid this duplication
-                .Background => |background| switch (background) {
-                    .Normal => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
-                    .Bright => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
+                .background => |background| switch (background) {
+                    .normal => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
+                    .bright => |color| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(color)}),
                     .@"8bit" => |color_code| buff.* = buff.* ++ fmt.comptimePrint("48;5;{d};", .{color_code}),
                     .@"24bit" => |color| buff.* = buff.* ++ fmt.comptimePrint("48;2;{d};{d};{d};", .{ color.r, color.g, color.b }),
                 },
-                .Underline => |underline| switch (underline) {
+                .underline => |underline| switch (underline) {
                     .@"8bit" => |color_code| buff.* = buff.* ++ fmt.comptimePrint("58;5;{d};", .{color_code}),
                     .@"24bit" => |color| buff.* = buff.* ++ fmt.comptimePrint("58;2;{d};{d};{d};", .{ color.r, color.g, color.b }),
                 },
@@ -213,10 +214,10 @@ const BackgroundColors = CreateAvailableColors(10);
 ///     - `d` - Dim
 ///     - `i` - Italic
 ///     - `u` - Underline
-///     - `r` - Inverted (reversed)
 ///     - `s` - Strike through (crossed)
 ///     - `o` - Overlined
 ///     - `du` - Double Underline
+///     - `inv` - Inverse (reverse)
 /// - Colors:
 ///     - `f:<color>` - 3bit & 4bit Foreground Coloring (prefix with `b` for bright colors) ex: `f:bRed`, `f:blue`
 ///     - `f:n` - 8bit (0 - 255) Foreground Coloring
@@ -285,10 +286,6 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
                         appendAttribute(&final_text, .Underline, previous_is_token);
                     },
-                    'r' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Reversed});
-                        appendAttribute(&final_text, .Invert, previous_is_token);
-                    },
                     's' => {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Crossed_Out});
                         appendAttribute(&final_text, .Crossed, previous_is_token);
@@ -307,6 +304,9 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                             final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)})
                         else
                             final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)});
+                    } else if (mem.eql(u8, token, "inv")) {
+                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Reversed});
+                        appendAttribute(&final_text, .Invert, previous_is_token);
                     } else if (token[0] == 'f') {
                         // Skip `f` and `:`
                         const color_part = token[2..];
