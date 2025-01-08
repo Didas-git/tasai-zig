@@ -1,6 +1,7 @@
 const std = @import("std");
 const SGR = @import("./sgr.zig");
-const hyperlink = @import("./osc.zig").hyperlink;
+
+pub const hyperlink = @import("./osc.zig").hyperlink;
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
@@ -27,7 +28,7 @@ pub fn main() !void {
         }), &.{.{ .Color = .{ .Background = .{ .Normal = .Black } } }}, &.{.{ .Attribute = .Default_Background_Color }}),
     });
 
-    const str = SGR.Parser.parse("<du><u:30,255,120>Test<r><r>: <b:black><f:255,0,239>Hello<r> <f:33><b>World<r><r><r>!");
+    const str = SGR.Parser.parse("<du><u:30,255,120>Test<r><r>: <b:black><f:#ff00ef>Hello<r> <f:33><b>World<r><r><r>!");
     std.debug.print("{s}\n", .{str});
     std.debug.print("{s}\n", .{SGR.Parser.parse("This: <b><f:red>\\<<r> should print without issues<r>")});
 
