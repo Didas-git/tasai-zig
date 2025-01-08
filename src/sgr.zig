@@ -170,6 +170,43 @@ fn parseModifiers(buff: *[]const u8, modifiers: []const SGRModifier) void {
 }
 
 pub const Parser = struct {
+    const SGRCode = struct {
+        open: u8,
+        close: u8,
+    };
+    /// This structure does not follow naming conventions
+    /// as it is intended to be an internal map
+    fn CreateAvailableColors(comptime additive: u8) type {
+        const close: u8 = switch (additive) {
+            0 => @intFromEnum(SGRAttribute.Default_Foreground_Color),
+            10 => @intFromEnum(SGRAttribute.Default_Background_Color),
+            else => @compileError("Only 0 and 10 are supported additives."),
+        };
+
+        return struct {
+            const black: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Black) + additive, .close = close };
+            const red: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Red) + additive, .close = close };
+            const green: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Green) + additive, .close = close };
+            const yellow: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Yellow) + additive, .close = close };
+            const blue: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Blue) + additive, .close = close };
+            const magenta: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Magenta) + additive, .close = close };
+            const cyan: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Cyan) + additive, .close = close };
+            const white: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_White) + additive, .close = close };
+            const bBlack: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Black) + additive, .close = close };
+            const bRed: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Red) + additive, .close = close };
+            const bGreen: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Green) + additive, .close = close };
+            const bYellow: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Yellow) + additive, .close = close };
+            const bBlue: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Blue) + additive, .close = close };
+            const bMagenta: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Magenta) + additive, .close = close };
+            const bCyan: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Cyan) + additive, .close = close };
+            const bWhite: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_White) + additive, .close = close };
+            const gray = bBlack;
+            const grey = bBlack;
+        };
+    }
+
+    const ForegroundColors = CreateAvailableColors(0);
+    const BackgroundColors = CreateAvailableColors(10);
     /// Currently supported tokens:
     /// - Normal Attributes:
     ///     - `r` - Smart Reset
@@ -221,44 +258,27 @@ pub const Parser = struct {
                 const token = text[start..i];
                 switch (token.len) {
                     0 => @compileError("Invalid Token."),
-                    // Duplication galore
                     1 => switch (token[0]) {
                         'r' => {
                             if (stack.len == 0) @compileError(fmt.comptimePrint("Extra reset tag found at index '{d}'", .{start + 1}));
-                            const close_tag = stack[stack.len - 1];
+                            appendAttribute(&final_text, stack[stack.len - 1], previous_is_token);
                             stack = stack[0 .. stack.len - 1];
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(close_tag)})
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(close_tag)});
                         },
                         'b' => {
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Bold_Or_Dim});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Bold)})
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Bold)});
+                            appendAttribute(&final_text, .Bold, previous_is_token);
                         },
                         'd' => {
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Bold_Or_Dim});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Dim)})
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Dim)});
+                            appendAttribute(&final_text, .Dim, previous_is_token);
                         },
                         'i' => {
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Italic});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Italic)})
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Italic)});
+                            appendAttribute(&final_text, .Italic, previous_is_token);
                         },
                         'u' => {
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Underline)})
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Underline)});
+                            appendAttribute(&final_text, .Underline, previous_is_token);
                         },
                         else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
                     },
@@ -278,93 +298,22 @@ pub const Parser = struct {
 
                             const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
                             if (possibly_a_int == error.InvalidCharacter) {
-                                var open_attr: SGRAttribute = undefined;
-                                var close_attr: SGRAttribute = undefined;
-                                if (mem.eql(u8, color_part, "black")) {
-                                    open_attr = .Foreground_Black;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "red")) {
-                                    open_attr = .Foreground_Red;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "green")) {
-                                    open_attr = .Foreground_Green;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "yellow")) {
-                                    open_attr = .Foreground_Yellow;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "blue")) {
-                                    open_attr = .Foreground_Blue;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "magenta")) {
-                                    open_attr = .Foreground_Magenta;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "cyan")) {
-                                    open_attr = .Foreground_Cyan;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "white")) {
-                                    open_attr = .Foreground_White;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bBlack") or mem.eql(u8, color_part, "gray") or mem.eql(u8, color_part, "grey")) {
-                                    open_attr = .Foreground_Bright_Black;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bRed")) {
-                                    open_attr = .Foreground_Bright_Red;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bGreen")) {
-                                    open_attr = .Foreground_Bright_Green;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bYellow")) {
-                                    open_attr = .Foreground_Bright_Yellow;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bBlue")) {
-                                    open_attr = .Foreground_Bright_Blue;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bMagenta")) {
-                                    open_attr = .Foreground_Bright_Magenta;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bCyan")) {
-                                    open_attr = .Foreground_Bright_Cyan;
-                                    close_attr = .Default_Foreground_Color;
-                                } else if (mem.eql(u8, color_part, "bWhite")) {
-                                    open_attr = .Foreground_Bright_White;
-                                    close_attr = .Default_Foreground_Color;
-                                }
+                                const color = @field(ForegroundColors, color_part);
 
-                                stack = stack ++ @as([]const SGRAttribute, &.{close_attr});
-                                final_text = if (previous_is_token)
-                                    final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(open_attr)})
-                                else
-                                    final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(open_attr)});
-
+                                stack = stack ++ @as([]const SGRAttribute, &.{@enumFromInt(color.close)});
+                                appendAttribute(&final_text, @enumFromInt(color.open), previous_is_token);
                                 continue;
                             }
                             // Handle 8bit colors
                             if (color_part.len <= 3) {
-                                const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
                                 stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Foreground_Color});
-                                final_text = if (previous_is_token)
-                                    final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Foreground_Color), color })
-                                else
-                                    final_text ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Foreground_Color), color });
+                                append8BitColor(&final_text, color_part, .Set_Foreground_Color, previous_is_token);
                                 continue;
                             }
 
                             // Handle 24 bit colors
-                            // 11 is the max length of `rrr,ggg,bbb`
-                            if (color_part.len > 12) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
-
-                            var rgb: []const u8 = &.{};
-                            var iterator = mem.split(u8, color_part, ",");
-                            while (iterator.next()) |color_channel| {
-                                const channel_code = fmt.parseInt(u8, color_channel, 10) catch @compileError("Failed to parse color");
-                                rgb = rgb ++ @as([]const u8, &.{channel_code});
-                            }
-
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Foreground_Color});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Foreground_Color), rgb[0], rgb[1], rgb[2] })
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Foreground_Color), rgb[0], rgb[1], rgb[2] });
+                            append24BitColor(&final_text, color_part, .Set_Foreground_Color, previous_is_token);
                         } else if (token[0] == 'b') {
                             // Skip `b` and `:`
                             const color_part = token[2..];
@@ -373,93 +322,22 @@ pub const Parser = struct {
 
                             const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
                             if (possibly_a_int == error.InvalidCharacter) {
-                                var open_attr: SGRAttribute = undefined;
-                                var close_attr: SGRAttribute = undefined;
-                                if (mem.eql(u8, color_part, "black")) {
-                                    open_attr = .Background_Black;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "red")) {
-                                    open_attr = .Background_Red;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "green")) {
-                                    open_attr = .Background_Green;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "yellow")) {
-                                    open_attr = .Background_Yellow;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "blue")) {
-                                    open_attr = .Background_Blue;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "magenta")) {
-                                    open_attr = .Background_Magenta;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "cyan")) {
-                                    open_attr = .Background_Cyan;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "white")) {
-                                    open_attr = .Background_White;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bBlack") or mem.eql(u8, color_part, "gray") or mem.eql(u8, color_part, "grey")) {
-                                    open_attr = .Background_Bright_Black;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bRed")) {
-                                    open_attr = .Background_Bright_Red;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bGreen")) {
-                                    open_attr = .Background_Bright_Green;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bYellow")) {
-                                    open_attr = .Background_Bright_Yellow;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bBlue")) {
-                                    open_attr = .Background_Bright_Blue;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bMagenta")) {
-                                    open_attr = .Background_Bright_Magenta;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bCyan")) {
-                                    open_attr = .Background_Bright_Cyan;
-                                    close_attr = .Default_Background_Color;
-                                } else if (mem.eql(u8, color_part, "bWhite")) {
-                                    open_attr = .Background_Bright_White;
-                                    close_attr = .Default_Background_Color;
-                                }
+                                const color = @field(BackgroundColors, color_part);
 
-                                stack = stack ++ @as([]const SGRAttribute, &.{close_attr});
-                                final_text = if (previous_is_token)
-                                    final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(open_attr)})
-                                else
-                                    final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(open_attr)});
-
+                                stack = stack ++ @as([]const SGRAttribute, &.{@enumFromInt(color.close)});
+                                appendAttribute(&final_text, @enumFromInt(color.open), previous_is_token);
                                 continue;
                             }
                             // Handle 8bit colors
                             if (color_part.len <= 3) {
-                                const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
                                 stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Background_Color});
-                                final_text = if (previous_is_token)
-                                    final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), color })
-                                else
-                                    final_text ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), color });
+                                append8BitColor(&final_text, color_part, .Set_Background_Color, previous_is_token);
                                 continue;
                             }
 
                             // Handle 24 bit colors
-                            // 11 is the max length of `rrr,ggg,bbb`
-                            if (color_part.len > 12) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
-
-                            var rgb: []const u8 = &.{};
-                            var iterator = mem.split(u8, color_part, ",");
-                            while (iterator.next()) |color_channel| {
-                                const channel_code = fmt.parseInt(u8, color_channel, 10) catch @compileError("Failed to parse color");
-                                rgb = rgb ++ @as([]const u8, &.{channel_code});
-                            }
-
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Background_Color});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), rgb[0], rgb[1], rgb[2] })
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), rgb[0], rgb[1], rgb[2] });
+                            append24BitColor(&final_text, color_part, .Set_Background_Color, previous_is_token);
                         } else if (token[0] == 'u') {
                             // Skip `u` and `:`
                             const color_part = token[2..];
@@ -468,31 +346,14 @@ pub const Parser = struct {
 
                             // Handle 8bit colors
                             if (color_part.len <= 3) {
-                                const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
                                 stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Background_Color});
-                                final_text = if (previous_is_token)
-                                    final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), color })
-                                else
-                                    final_text ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(SGRAttribute.Set_Background_Color), color });
+                                append8BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
                                 continue;
                             }
 
                             // Handle 24bit colors
-                            // 11 is the max length of `rrr,ggg,bbb`
-                            if (color_part.len > 12) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
-
-                            var rgb: []const u8 = &.{};
-                            var iterator = mem.split(u8, color_part, ",");
-                            while (iterator.next()) |color_channel| {
-                                const channel_code = fmt.parseInt(u8, color_channel, 10) catch @compileError("Failed to parse color");
-                                rgb = rgb ++ @as([]const u8, &.{channel_code});
-                            }
-
                             stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Underline_Color});
-                            final_text = if (previous_is_token)
-                                final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Underline_Color), rgb[0], rgb[1], rgb[2] })
-                            else
-                                final_text ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(SGRAttribute.Set_Underline_Color), rgb[0], rgb[1], rgb[2] });
+                            append24BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
                         } else {
                             @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token}));
                         }
@@ -506,5 +367,47 @@ pub const Parser = struct {
 
             return final_text;
         }
+    }
+
+    fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: bool) void {
+        buff.* = if (trim_last_byte)
+            buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(attribute)})
+        else
+            buff.* ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(attribute)});
+    }
+
+    fn append8BitColor(
+        buff: *[]const u8,
+        color_part: []const u8,
+        open_code: SGRAttribute,
+        trim_last_byte: bool,
+    ) void {
+        const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
+        buff.* = if (trim_last_byte)
+            buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(open_code), color })
+        else
+            buff.* ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(open_code), color });
+    }
+
+    fn append24BitColor(
+        buff: *[]const u8,
+        color_part: []const u8,
+        open_code: SGRAttribute,
+        trim_last_byte: bool,
+    ) void {
+        // 11 is the max length of `rrr,ggg,bbb`
+        if (color_part.len > 11) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
+
+        var rgb: []const u8 = &.{};
+        var iterator = mem.split(u8, color_part, ",");
+        while (iterator.next()) |color_channel| {
+            const channel_code = fmt.parseInt(u8, color_channel, 10) catch @compileError("Failed to parse color");
+            rgb = rgb ++ @as([]const u8, &.{channel_code});
+        }
+
+        buff.* = if (trim_last_byte)
+            buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] })
+        else
+            buff.* ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] });
     }
 };
