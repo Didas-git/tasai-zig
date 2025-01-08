@@ -14,7 +14,7 @@ pub const SGRAttribute = enum(u8) {
     Rapid_Blink,
     Invert,
     Hide,
-    Strikethrough,
+    Crossed,
     Default_Font,
     Font_1,
     Font_2,
@@ -213,16 +213,22 @@ const BackgroundColors = CreateAvailableColors(10);
 ///     - `d` - Dim
 ///     - `i` - Italic
 ///     - `u` - Underline
+///     - `r` - Inverted (reversed)
+///     - `s` - Strike through (crossed)
+///     - `o` - Overlined
 ///     - `du` - Double Underline
 /// - Colors:
 ///     - `f:<color>` - 3bit & 4bit Foreground Coloring (prefix with `b` for bright colors) ex: `f:bRed`, `f:blue`
 ///     - `f:n` - 8bit (0 - 255) Foreground Coloring
 ///     - `f:r,g,b` - 24bit (rgb) Foreground Coloring
+///     - `f:#ffffff` - Hex code (24bit)
 ///     - `b:<color>` - 3bit & 4bit Background Coloring (prefix with `b` for bright colors)
 ///     - `b:n` - 8bit (0 - 255) Background Coloring
 ///     - `b:r,g,b` - 24bit (rgb) Background Coloring
+///     - `b:#ffffff` - Hex code (24bit)
 ///     - `u:n` - 8bit (0 - 255) Underline Coloring
 ///     - `u:r,g,b` - 24bit (rgb) Underline Coloring
+///     - `u:#ffffff` - Hex code (24bit)
 pub inline fn parseString(comptime text: []const u8) []const u8 {
     comptime {
         var final_text: []const u8 = &.{};
@@ -278,6 +284,18 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                     'u' => {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
                         appendAttribute(&final_text, .Underline, previous_is_token);
+                    },
+                    'r' => {
+                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Reversed});
+                        appendAttribute(&final_text, .Invert, previous_is_token);
+                    },
+                    's' => {
+                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Crossed_Out});
+                        appendAttribute(&final_text, .Crossed, previous_is_token);
+                    },
+                    'o' => {
+                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Overlined});
+                        appendAttribute(&final_text, .Overlined, previous_is_token);
                     },
                     else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
                 },
