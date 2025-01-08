@@ -13,8 +13,7 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    b.addModule("tasai", .{
-        .name = "tasai",
+    _ = b.addModule("tasai", .{
         .root_source_file = b.path("src/tasai.zig"),
     });
 
