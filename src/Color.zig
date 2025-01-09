@@ -165,7 +165,7 @@ pub fn fromHex(hex: []const u8) !Color {
     return Color.init(r, g, b, null);
 }
 
-pub fn fromCXM(hueRegion: f64, chr: f64, X: f64, m: f64, alpha: f64) Color {
+pub fn fromCXM(hueRegion: u64, chr: f64, X: f64, m: f64, alpha: f64) Color {
     return switch (hueRegion) {
         0 => return Color.init(chr + m, X + m, m, alpha),
         1 => return Color.init(X + m, chr + m, m, alpha),
@@ -194,14 +194,14 @@ pub fn fromHSV(h: f64, saturation: f64, val: f64, alpha: ?f64) Color {
 }
 
 pub fn fromHSL(h: f64, saturation: f64, l: f64, alpha: ?f64) Color {
-    const chr = (1 - Math.abs(2 * l - 1)) * saturation;
+    const chr = (1 - @abs(2 * l - 1)) * saturation;
     const scaledHue = h * 6;
 
     // integer to isolate the 6 separate cases for hue
-    const hueRegion = Math.floor(scaledHue);
+    const hueRegion = @floor(scaledHue);
 
     // intermediate value for second largest component
-    const X = chr * (1 - Math.abs(scaledHue % 2 - 1));
+    const X = chr * (1 - @abs(scaledHue % 2 - 1));
 
     // constant to add to all color components
     const m = l - chr * 0.5;
@@ -213,9 +213,9 @@ pub fn fromHSI(h: f64, saturation: f64, in: f64, alpha: ?f64) Color {
     const scaledHue = h * 6;
 
     // integer to isolate the 6 separate cases for hue
-    const hueRegion = Math.floor(scaledHue);
+    const hueRegion = @floor(scaledHue);
 
-    const Z = 1 - Math.abs(scaledHue % 2 - 1);
+    const Z = 1 - @abs(scaledHue % 2 - 1);
 
     const chr = 3 * in * saturation / (1 + Z);
 
