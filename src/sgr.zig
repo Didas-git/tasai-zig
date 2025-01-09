@@ -224,13 +224,18 @@ const BackgroundColors = CreateAvailableColors(10);
 ///     - `f:n` - 8bit (0 - 255) Foreground Coloring
 ///     - `f:r,g,b` - 24bit (rgb) Foreground Coloring
 ///     - `f:#ffffff` - Hex code (24bit)
+///     - `f:<color_space>:x,y,z` - 24bit color using specific color space
 ///     - `b:<color>` - 3bit & 4bit Background Coloring (prefix with `b` for bright colors)
 ///     - `b:n` - 8bit (0 - 255) Background Coloring
 ///     - `b:r,g,b` - 24bit (rgb) Background Coloring
 ///     - `b:#ffffff` - Hex code (24bit)
+///     - `b:<color_space>:x,y,z` - 24bit color using specific color space
 ///     - `u:n` - 8bit (0 - 255) Underline Coloring
 ///     - `u:r,g,b` - 24bit (rgb) Underline Coloring
 ///     - `u:#ffffff` - Hex code (24bit)
+///     - `u:<color_space>:x,y,z` - 24bit color using specific color space
+///
+/// Available color spaces are: `hsv`, `hsl` and `hsi`
 pub inline fn parseString(comptime text: []const u8) []const u8 {
     comptime {
         var final_text: []const u8 = &.{};
@@ -319,6 +324,25 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                             if (color_part[0] == '#') {
                                 const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
                                 append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
+                                // Handle other color spaces as 24bit
+                            } else if (color_part[0] == 'h') {
+                                const color_space = color_part[0..3];
+                                const values = color_part[4..];
+                                if (mem.eql(u8, color_space, "hsl")) {
+                                    const hsl = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
+                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
+                                } else if (mem.eql(u8, color_space, "hsi")) {
+                                    const hsi = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
+                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
+                                } else if (mem.eql(u8, color_space, "hsv")) {
+                                    const hsv = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
+                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
+                                } else {
+                                    @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+                                }
                                 // Handle 4bit
                             } else {
                                 const color = @field(ForegroundColors, color_part);
@@ -342,8 +366,26 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         if (possibly_a_int == error.InvalidCharacter) {
                             // Handle hex as 24bit
                             if (color_part[0] == '#') {
-                                const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+                                const color = Color.fromHex(color_part) catch |err| @compileError(fmt.comptimePrint("Error {any}\nParsing: '{s}'", .{ err, color_part }));
                                 append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
+                            } else if (color_part[0] == 'h') {
+                                const color_space = color_part[0..3];
+                                const values = color_part[4..];
+                                if (mem.eql(u8, color_space, "hsl")) {
+                                    const hsl = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
+                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
+                                } else if (mem.eql(u8, color_space, "hsi")) {
+                                    const hsi = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
+                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
+                                } else if (mem.eql(u8, color_space, "hsv")) {
+                                    const hsv = parseStringArbitraryColorSpace(values);
+                                    const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
+                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
+                                } else {
+                                    @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+                                }
                                 // Handle 4bit
                             } else {
                                 const color = @field(BackgroundColors, color_part);
@@ -366,6 +408,24 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                             const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
                             append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
                             // Handle 8bit colors
+                        } else if (color_part[0] == 'h') {
+                            const color_space = color_part[0..3];
+                            const values = color_part[4..];
+                            if (mem.eql(u8, color_space, "hsl")) {
+                                const hsl = parseStringArbitraryColorSpace(values);
+                                const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
+                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
+                            } else if (mem.eql(u8, color_space, "hsi")) {
+                                const hsi = parseStringArbitraryColorSpace(values);
+                                const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
+                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
+                            } else if (mem.eql(u8, color_space, "hsv")) {
+                                const hsv = parseStringArbitraryColorSpace(values);
+                                const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
+                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
+                            } else {
+                                @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+                            }
                         } else if (color_part.len <= 3) {
                             append8BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
                             // Handle 24bit colors
@@ -426,12 +486,20 @@ fn parseStringRGB(
     // 11 is the max length of `rrr,ggg,bbb`
     if (color_part.len > 11) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
 
-    var rgb: []const u8 = &.{};
-    var iterator = mem.split(u8, color_part, ",");
-    while (iterator.next()) |color_channel| {
-        const channel_code = fmt.parseInt(u8, color_channel, 10) catch @compileError("Failed to parse color");
-        rgb = rgb ++ @as([]const u8, &.{channel_code});
-    }
+    const rgb = parseStringArbitraryColorSpace(color_part);
 
     return Color.init(rgb[0], rgb[1], rgb[2], null);
+}
+
+fn parseStringArbitraryColorSpace(color_part: []const u8) []const f64 {
+    var pieces: []const f64 = &.{};
+    var iterator = mem.split(u8, color_part, ",");
+
+    while (iterator.next()) |color_channel| {
+        const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));
+        pieces = pieces ++ @as([]const f64, &.{channel_code});
+    }
+
+    if (pieces.len > 3) @compileError("Invalid color part");
+    return pieces;
 }
