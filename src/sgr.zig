@@ -302,7 +302,6 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                     },
                     else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
                 },
-                // Deduplication can and will be done eventually™️
                 else => {
                     if (mem.eql(u8, token, "du")) {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
@@ -314,126 +313,11 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Inverted});
                         appendAttribute(&final_text, .Invert, previous_is_token);
                     } else if (token[0] == 'f') {
-                        // Skip `f` and `:`
-                        const color_part = token[2..];
-                        if (color_part.len < 1) @compileError("No valid color was passed.");
-                        const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
-
-                        if (possibly_a_int == error.InvalidCharacter) {
-                            // Handle hex as 24bit
-                            if (color_part[0] == '#') {
-                                const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
-                                append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
-                                // Handle other color spaces as 24bit
-                            } else if (color_part[0] == 'h') {
-                                const color_space = color_part[0..3];
-                                const values = color_part[4..];
-                                if (mem.eql(u8, color_space, "hsl")) {
-                                    const hsl = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
-                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
-                                } else if (mem.eql(u8, color_space, "hsi")) {
-                                    const hsi = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
-                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
-                                } else if (mem.eql(u8, color_space, "hsv")) {
-                                    const hsv = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
-                                    append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
-                                } else {
-                                    @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
-                                }
-                                // Handle 4bit
-                            } else {
-                                const color = @field(ForegroundColors, color_part);
-                                appendAttribute(&final_text, @enumFromInt(color.open), previous_is_token);
-                            }
-                            // Handle 8bit colors
-                        } else if (color_part.len <= 3) {
-                            append8BitColor(&final_text, color_part, .Set_Foreground_Color, previous_is_token);
-                            // Handle 24 bit colors
-                        } else {
-                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Foreground_Color, previous_is_token);
-                        }
-
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Foreground_Color});
+                        parseColorAttribute(&final_text, &stack, token, .Set_Foreground_Color, .Default_Foreground_Color, previous_is_token);
                     } else if (token[0] == 'b') {
-                        // Skip `b` and `:`
-                        const color_part = token[2..];
-                        if (color_part.len < 1) @compileError("No valid color was passed.");
-                        const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
-
-                        if (possibly_a_int == error.InvalidCharacter) {
-                            // Handle hex as 24bit
-                            if (color_part[0] == '#') {
-                                const color = Color.fromHex(color_part) catch |err| @compileError(fmt.comptimePrint("Error {any}\nParsing: '{s}'", .{ err, color_part }));
-                                append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
-                            } else if (color_part[0] == 'h') {
-                                const color_space = color_part[0..3];
-                                const values = color_part[4..];
-                                if (mem.eql(u8, color_space, "hsl")) {
-                                    const hsl = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
-                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
-                                } else if (mem.eql(u8, color_space, "hsi")) {
-                                    const hsi = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
-                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
-                                } else if (mem.eql(u8, color_space, "hsv")) {
-                                    const hsv = parseStringArbitraryColorSpace(values);
-                                    const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
-                                    append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
-                                } else {
-                                    @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
-                                }
-                                // Handle 4bit
-                            } else {
-                                const color = @field(BackgroundColors, color_part);
-                                appendAttribute(&final_text, @enumFromInt(color.open), previous_is_token);
-                            }
-                            // Handle 8bit colors
-                        } else if (color_part.len <= 3) {
-                            append8BitColor(&final_text, color_part, .Set_Background_Color, previous_is_token);
-                            // Handle 24 bit colors
-                        } else {
-                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Background_Color, previous_is_token);
-                        }
-
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Background_Color});
+                        parseColorAttribute(&final_text, &stack, token, .Set_Background_Color, .Default_Background_Color, previous_is_token);
                     } else if (token[0] == 'u') {
-                        // Skip `u` and `:`
-                        const color_part = token[2..];
-                        if (color_part.len < 1) @compileError("No valid color was passed.");
-                        if (color_part[0] == '#') {
-                            const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
-                            append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
-                            // Handle 8bit colors
-                        } else if (color_part[0] == 'h') {
-                            const color_space = color_part[0..3];
-                            const values = color_part[4..];
-                            if (mem.eql(u8, color_space, "hsl")) {
-                                const hsl = parseStringArbitraryColorSpace(values);
-                                const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
-                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
-                            } else if (mem.eql(u8, color_space, "hsi")) {
-                                const hsi = parseStringArbitraryColorSpace(values);
-                                const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
-                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
-                            } else if (mem.eql(u8, color_space, "hsv")) {
-                                const hsv = parseStringArbitraryColorSpace(values);
-                                const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
-                                append24BitColor(&final_text, color, .Set_Underline_Color, previous_is_token);
-                            } else {
-                                @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
-                            }
-                        } else if (color_part.len <= 3) {
-                            append8BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
-                            // Handle 24bit colors
-                        } else {
-                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Underline_Color, previous_is_token);
-                        }
-
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Underline_Color});
+                        parseColorAttribute(&final_text, &stack, token, .Set_Underline_Color, .Default_Underline_Color, previous_is_token);
                     } else {
                         @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token}));
                     }
@@ -446,6 +330,64 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
         if (stack.len > 0) @compileError("Text has an unclosed token.");
         return final_text;
     }
+}
+
+fn parseColorAttribute(
+    buf: *[]const u8,
+    stack: *[]const SGRAttribute,
+    token: []const u8,
+    opening_attribute: SGRAttribute,
+    closing_attribute: SGRAttribute,
+    trim_last_byte: bool,
+) void {
+    const color_part = token[2..];
+    if (color_part.len < 1) @compileError("No valid color was passed.");
+    const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
+
+    if (possibly_a_int == error.InvalidCharacter) {
+        // Handle hex as 24bit
+        if (color_part[0] == '#') {
+            const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+            append24BitColor(buf, color, opening_attribute, trim_last_byte);
+            // Handle other color spaces as 24bit
+        } else if (color_part[0] == 'h') {
+            const color_space = color_part[0..3];
+            const values = color_part[4..];
+            if (mem.eql(u8, color_space, "hsl")) {
+                const hsl = parseStringArbitraryColorSpace(values);
+                const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
+                append24BitColor(buf, color, opening_attribute, trim_last_byte);
+            } else if (mem.eql(u8, color_space, "hsi")) {
+                const hsi = parseStringArbitraryColorSpace(values);
+                const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
+                append24BitColor(buf, color, opening_attribute, trim_last_byte);
+            } else if (mem.eql(u8, color_space, "hsv")) {
+                const hsv = parseStringArbitraryColorSpace(values);
+                const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
+                append24BitColor(buf, color, opening_attribute, trim_last_byte);
+            } else {
+                @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+            }
+            // Handle 4bit
+        } else {
+            const color = switch (opening_attribute) {
+                .Set_Foreground_Color => @field(ForegroundColors, color_part),
+                .Set_Background_Color => @field(BackgroundColors, color_part),
+                .Set_Underline_Color => @compileError("Underline doesn't support 4bit colors."),
+                else => @compileError("Invalid Attribute"),
+            };
+
+            appendAttribute(buf, @enumFromInt(color.open), trim_last_byte);
+        }
+        // Handle 8bit colors
+    } else if (color_part.len <= 3) {
+        append8BitColor(buf, color_part, opening_attribute, trim_last_byte);
+        // Handle 24 bit colors
+    } else {
+        append24BitColor(buf, parseStringRGB(color_part), opening_attribute, trim_last_byte);
+    }
+
+    stack.* = stack.* ++ @as([]const SGRAttribute, &.{closing_attribute});
 }
 
 fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: bool) void {
