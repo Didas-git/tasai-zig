@@ -353,21 +353,19 @@ fn parseColorAttribute(
         } else if (color_part[0] == 'h') {
             const color_space = color_part[0..3];
             const values = color_part[4..];
-            if (mem.eql(u8, color_space, "hsl")) {
-                const hsl = parseStringArbitraryColorSpace(values);
-                const color = Color.fromHSL(hsl[0], hsl[1], hsl[2], null);
-                append24BitColor(buf, color, opening_attribute, trim_last_byte);
-            } else if (mem.eql(u8, color_space, "hsi")) {
-                const hsi = parseStringArbitraryColorSpace(values);
-                const color = Color.fromHSI(hsi[0], hsi[1], hsi[2], null);
-                append24BitColor(buf, color, opening_attribute, trim_last_byte);
-            } else if (mem.eql(u8, color_space, "hsv")) {
-                const hsv = parseStringArbitraryColorSpace(values);
-                const color = Color.fromHSL(hsv[0], hsv[1], hsv[2], null);
-                append24BitColor(buf, color, opening_attribute, trim_last_byte);
-            } else {
-                @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
-            }
+            if (color_space[1] != 's' or (color_space[2] != 'l' and color_space[2] != 'i' and color_space[2] != 'v')) @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+
+            var temp: [3]u8 = undefined;
+            const upper_color_space = std.ascii.upperString(&temp, color_space);
+            const parsed_color_space = parseStringArbitraryColorSpace(values);
+            const color = @call(.auto, @field(Color, fmt.comptimePrint("from{s}", .{upper_color_space})), .{
+                parsed_color_space[0],
+                parsed_color_space[1],
+                parsed_color_space[2],
+                null,
+            });
+
+            append24BitColor(buf, color, opening_attribute, trim_last_byte);
             // Handle 4bit
         } else {
             const color = switch (opening_attribute) {
