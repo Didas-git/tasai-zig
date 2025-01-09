@@ -1,3 +1,4 @@
+const Color = @import("./Color.zig");
 const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
@@ -316,7 +317,8 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         if (possibly_a_int == error.InvalidCharacter) {
                             // Handle hex as 24bit
                             if (color_part[0] == '#') {
-                                append24BitColorFromHex(&final_text, hexToRgb(color_part[1..]), .Set_Foreground_Color, previous_is_token);
+                                const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+                                append24BitColor(&final_text, color, .Set_Foreground_Color, previous_is_token);
                                 // Handle 4bit
                             } else {
                                 const color = @field(ForegroundColors, color_part);
@@ -327,7 +329,7 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                             append8BitColor(&final_text, color_part, .Set_Foreground_Color, previous_is_token);
                             // Handle 24 bit colors
                         } else {
-                            append24BitColor(&final_text, color_part, .Set_Foreground_Color, previous_is_token);
+                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Foreground_Color, previous_is_token);
                         }
 
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Foreground_Color});
@@ -340,7 +342,8 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         if (possibly_a_int == error.InvalidCharacter) {
                             // Handle hex as 24bit
                             if (color_part[0] == '#') {
-                                append24BitColorFromHex(&final_text, hexToRgb(color_part[1..]), .Set_Background_Color, previous_is_token);
+                                const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+                                append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
                                 // Handle 4bit
                             } else {
                                 const color = @field(BackgroundColors, color_part);
@@ -351,7 +354,7 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                             append8BitColor(&final_text, color_part, .Set_Background_Color, previous_is_token);
                             // Handle 24 bit colors
                         } else {
-                            append24BitColor(&final_text, color_part, .Set_Background_Color, previous_is_token);
+                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Background_Color, previous_is_token);
                         }
 
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Background_Color});
@@ -360,13 +363,14 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         const color_part = token[2..];
                         if (color_part.len < 1) @compileError("No valid color was passed.");
                         if (color_part[0] == '#') {
-                            append24BitColorFromHex(&final_text, hexToRgb(color_part[1..]), .Set_Background_Color, previous_is_token);
+                            const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+                            append24BitColor(&final_text, color, .Set_Background_Color, previous_is_token);
                             // Handle 8bit colors
                         } else if (color_part.len <= 3) {
                             append8BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
                             // Handle 24bit colors
                         } else {
-                            append24BitColor(&final_text, color_part, .Set_Underline_Color, previous_is_token);
+                            append24BitColor(&final_text, parseStringRGB(color_part), .Set_Underline_Color, previous_is_token);
                         }
 
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Default_Underline_Color});
@@ -382,41 +386,6 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
         if (stack.len > 0) @compileError("Text has an unclosed token.");
         return final_text;
     }
-}
-
-fn hexToRgb(hex: []const u8) []const u8 {
-    var temp = [_]f32{ 0, 0, 0 };
-    const color = fmt.parseInt(u32, hex, 16) catch @compileError("Failed to parse color");
-
-    switch (hex.len) {
-        2 => {
-            temp[0] = @as(f32, (color & 0b1110_0000)) / 0b1110_0000;
-            temp[1] = @as(f32, (color & 0b0001_1100)) / 0b0001_1100;
-            temp[2] = @as(f32, (color & 0b0000_0011)) / 0b0000_0011;
-        },
-        3 => {
-            temp[0] = @as(f32, (color & 0xF00)) / 0xF00;
-            temp[1] = @as(f32, (color & 0x0F0)) / 0x0F0;
-            temp[2] = @as(f32, (color & 0x00F)) / 0x00F;
-        },
-        4 => {
-            temp[0] = @as(f32, (color & 0xF800)) / 0xF800;
-            temp[1] = @as(f32, (color & 0x07E0)) / 0x07E0;
-            temp[2] = @as(f32, (color & 0x001F)) / 0x001F;
-        },
-        6 => {
-            temp[0] = @as(f32, (color & 0xFF_00_00)) / 0xFF_00_00;
-            temp[1] = @as(f32, (color & 0x00_FF_00)) / 0x00_FF_00;
-            temp[2] = @as(f32, (color & 0x00_00_FF)) / 0x00_00_FF;
-        },
-        else => @compileError("Invalid hex length."),
-    }
-
-    return &.{
-        @round(@min(@max(temp[0], 0), 1) * 0xFF),
-        @round(@min(@max(temp[1], 0), 1) * 0xFF),
-        @round(@min(@max(temp[2], 0), 1) * 0xFF),
-    };
 }
 
 fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: bool) void {
@@ -439,24 +408,21 @@ fn append8BitColor(
         buff.* ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(open_code), color });
 }
 
-fn append24BitColorFromHex(
+fn append24BitColor(
     buff: *[]const u8,
-    rgb: []const u8,
+    color: Color,
     open_code: SGRAttribute,
     trim_last_byte: bool,
 ) void {
     buff.* = if (trim_last_byte)
-        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] })
+        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() })
     else
-        buff.* ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] });
+        buff.* ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() });
 }
 
-fn append24BitColor(
-    buff: *[]const u8,
+fn parseStringRGB(
     color_part: []const u8,
-    open_code: SGRAttribute,
-    trim_last_byte: bool,
-) void {
+) Color {
     // 11 is the max length of `rrr,ggg,bbb`
     if (color_part.len > 11) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
 
@@ -467,8 +433,5 @@ fn append24BitColor(
         rgb = rgb ++ @as([]const u8, &.{channel_code});
     }
 
-    buff.* = if (trim_last_byte)
-        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] })
-    else
-        buff.* ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), rgb[0], rgb[1], rgb[2] });
+    return Color.init(rgb[0], rgb[1], rgb[2], null);
 }
