@@ -1,6 +1,7 @@
 const std = @import("std");
 const SGR = @import("./csi.zig").SGR;
 const hyperlink = @import("./osc.zig").hyperlink;
+const ANSI = @import("./ansi.zig");
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
@@ -35,4 +36,10 @@ pub fn main() !void {
     const Params = struct { id: u8 };
     std.debug.print("{s}\n", .{hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
     std.debug.print("{s}\n", .{SGR.parseString("<b:hsi:0,0,0><f:hsv:0,255,255>Hello<r> <f:hsl:0.1,1,0.5>World<r><r>")});
+
+    std.debug.print("{s}\n", .{ANSI.comptimeStrip(str)});
+
+    var buf: [255]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buf);
+    std.debug.print("{s}\n", .{try ANSI.strip(fba.allocator(), str)});
 }

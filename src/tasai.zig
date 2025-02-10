@@ -1,4 +1,4 @@
-pub usingnamespace @import("./control_codes.zig");
+pub usingnamespace @import("./ansi.zig");
 
 pub const Color = @import("Color.zig");
 pub const CSI = @import("./csi.zig");

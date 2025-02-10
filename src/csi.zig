@@ -1,4 +1,4 @@
-const FeEscapeSequence = @import("./control_codes.zig").FeEscapeSequence;
+const FeEscapeSequence = @import("./ansi.zig").FeEscapeSequence;
 const std = @import("std");
 
 pub const CUU = CommandWithAmount('A');

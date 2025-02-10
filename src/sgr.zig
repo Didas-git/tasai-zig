@@ -1,4 +1,4 @@
-const FeEscapeSequence = @import("./control_codes.zig").FeEscapeSequence;
+const FeEscapeSequence = @import("./ansi.zig").FeEscapeSequence;
 const Color = @import("./Color.zig");
 const std = @import("std");
 const fmt = std.fmt;
