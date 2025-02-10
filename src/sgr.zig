@@ -1,3 +1,4 @@
+const FeEscapeSequence = @import("./control_codes.zig").FeEscapeSequence;
 const Color = @import("./Color.zig");
 const std = @import("std");
 const fmt = std.fmt;
@@ -137,8 +138,8 @@ pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifier
         parseModifiers(&close, closing_modifiers);
 
         var temp: []const u8 = text;
-        if (open.len > 0) temp = "\x1B[" ++ open[0 .. open.len - 1] ++ @as([]const u8, &.{'m'}) ++ temp;
-        if (close.len > 0) temp = temp ++ "\x1B[" ++ close[0 .. close.len - 1] ++ @as([]const u8, &.{'m'});
+        if (open.len > 0) temp = FeEscapeSequence.CSI ++ open[0 .. open.len - 1] ++ @as([]const u8, &.{'m'}) ++ temp;
+        if (close.len > 0) temp = temp ++ FeEscapeSequence.CSI ++ close[0 .. close.len - 1] ++ @as([]const u8, &.{'m'});
 
         return temp;
     }
@@ -308,7 +309,7 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         final_text = if (previous_is_token)
                             final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)})
                         else
-                            final_text ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)});
+                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)});
                     } else if (mem.eql(u8, token, "inv")) {
                         stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Inverted});
                         appendAttribute(&final_text, .Invert, previous_is_token);
@@ -392,7 +393,7 @@ fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: b
     buff.* = if (trim_last_byte)
         buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(attribute)})
     else
-        buff.* ++ fmt.comptimePrint("\x1B[{d}m", .{@intFromEnum(attribute)});
+        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)});
 }
 
 fn append8BitColor(
@@ -405,7 +406,7 @@ fn append8BitColor(
     buff.* = if (trim_last_byte)
         buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(open_code), color })
     else
-        buff.* ++ fmt.comptimePrint("\x1B[{d};5;{d}m", .{ @intFromEnum(open_code), color });
+        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};5;{d}m", .{ @intFromEnum(open_code), color });
 }
 
 fn append24BitColor(
@@ -417,7 +418,7 @@ fn append24BitColor(
     buff.* = if (trim_last_byte)
         buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() })
     else
-        buff.* ++ fmt.comptimePrint("\x1B[{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() });
+        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() });
 }
 
 fn parseStringRGB(
