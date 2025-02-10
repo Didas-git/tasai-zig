@@ -1,7 +1,7 @@
 const std = @import("std");
-const SGR = @import("./csi.zig").SGR;
-const hyperlink = @import("./osc.zig").hyperlink;
+const OSC = @import("./osc.zig");
 const ANSI = @import("./ansi.zig");
+const SGR = @import("./csi.zig").SGR;
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
@@ -32,9 +32,9 @@ pub fn main() !void {
     std.debug.print("{s}\n", .{str});
     std.debug.print("{s}\n", .{SGR.parseString("This: <b><f:red>\\<<r> should print without issues<r>")});
 
-    std.debug.print("{s}\n", .{hyperlink("My link", "https://google.com/", null)});
+    std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", null)});
     const Params = struct { id: u8 };
-    std.debug.print("{s}\n", .{hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
+    std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
     std.debug.print("{s}\n", .{SGR.parseString("<b:hsi:0,0,0><f:hsv:0,255,255>Hello<r> <f:hsl:0.1,1,0.5>World<r><r>")});
 
     std.debug.print("{s}\n", .{ANSI.comptimeStrip(str)});

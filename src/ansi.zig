@@ -107,42 +107,54 @@ inline fn sequence(comptime char: u8) []const u8 {
     return std.fmt.comptimePrint("{c}{c}", .{ @intFromEnum(ControlCode.ESC), char });
 }
 
+pub fn isControlCode(char: u8) bool {
+    return char <= @intFromEnum(ControlCode.SP) or (char >= @intFromEnum(ControlCode.DEL) and char <= @intFromEnum(ControlCode.APC));
+}
+
+fn parseControlCode(str: []const u8) usize {
+    var i: usize = 0;
+    const char = str[i];
+    if (char == @intFromEnum(ControlCode.ESC)) {
+        i += 1;
+        switch (str[i]) {
+            // CSI
+            '[' => {
+                while (true) : (i += 1) {
+                    if (str[i] == 'm') {
+                        i += 1;
+                        break;
+                    }
+                }
+            },
+            // OSC
+            ']' => {
+                while (true) : (i += 1) {
+                    if (str[i] == @intFromEnum(ControlCode.ESC) and str[i + 1] == '\\') {
+                        i += 2;
+                        break;
+                    }
+                }
+            },
+            // TODO: See if optimizations can be done here
+            'N', 'O', 'P', '\\', 'X', '^', '_' => {},
+            else => {},
+        }
+    }
+
+    return i;
+}
+
 pub inline fn comptimeStrip(comptime str: []const u8) []const u8 {
     comptime {
         var buf: []const u8 = &.{};
 
         var i: usize = 0;
         while (i < str.len) : (i += 1) {
-            const char = str[i];
-            switch (char) {
-                @intFromEnum(ControlCode.ESC) => {
-                    i += 1;
-                    switch (str[i]) {
-                        // CSI
-                        '[' => {
-                            while (true) : (i += 1) {
-                                if (str[i] == 'm') {
-                                    break;
-                                }
-                            }
-                        },
-                        // OSC
-                        ']' => {
-                            while (true) : (i += 1) {
-                                if (str[i] == @intFromEnum(ControlCode.ESC) and str[i + 1] == '\\') {
-                                    i += 1;
-                                    break;
-                                }
-                            }
-                        },
-                        'N', 'O', 'P', '\\', 'X', '^', '_' => @compileError("Not yet cleanable."),
-                        else => {},
-                    }
-                },
-                else => {
-                    buf = buf ++ .{char};
-                },
+            if (isControlCode(str[i])) {
+                i += parseControlCode(str[i..]);
             }
+
+            buf = buf ++ .{str[i]};
         }
 
         return buf;
@@ -154,36 +166,11 @@ pub fn strip(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
 
     var i: usize = 0;
     while (i < str.len) : (i += 1) {
-        const char = str[i];
-        switch (char) {
-            @intFromEnum(ControlCode.ESC) => {
-                i += 1;
-                try switch (str[i]) {
-                    // CSI
-                    '[' => {
-                        while (true) : (i += 1) {
-                            if (str[i] == 'm') {
-                                break;
-                            }
-                        }
-                    },
-                    // OSC
-                    ']' => {
-                        while (true) : (i += 1) {
-                            if (str[i] == @intFromEnum(ControlCode.ESC) and str[i + 1] == '\\') {
-                                i += 1;
-                                break;
-                            }
-                        }
-                    },
-                    'N', 'O', 'P', '\\', 'X', '^', '_' => error.NotCleanable,
-                    else => {},
-                };
-            },
-            else => {
-                try arr.append(char);
-            },
+        if (isControlCode(str[i])) {
+            i += parseControlCode(str[i..]);
         }
+
+        try arr.append(str[i]);
     }
 
     return arr.toOwnedSlice();
