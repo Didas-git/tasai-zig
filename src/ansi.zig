@@ -107,14 +107,14 @@ inline fn sequence(comptime char: u8) []const u8 {
     return std.fmt.comptimePrint("{c}{c}", .{ @intFromEnum(ControlCode.ESC), char });
 }
 
+/// CR, LF, and other whitespace characters are ignored
 pub fn isControlCode(char: u8) bool {
-    return char <= @intFromEnum(ControlCode.SP) or (char >= @intFromEnum(ControlCode.DEL) and char <= @intFromEnum(ControlCode.APC));
+    return !std.ascii.isWhitespace(char) and (char <= @intFromEnum(ControlCode.SP) or (char >= @intFromEnum(ControlCode.DEL) and char <= @intFromEnum(ControlCode.APC)));
 }
 
 fn parseControlCode(str: []const u8) usize {
     var i: usize = 0;
-    const char = str[i];
-    if (char == @intFromEnum(ControlCode.ESC)) {
+    if (str[i] == @intFromEnum(ControlCode.ESC)) {
         i += 1;
         switch (str[i]) {
             // CSI
