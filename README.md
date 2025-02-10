@@ -21,6 +21,7 @@ const tasai = b.dependency("tasai", .{
     .target = target,
     .optimize = optimize,
 });
+
 exe.root_module.addImport("tasai", tasai.module("tasai"));
 ```
 
@@ -34,7 +35,7 @@ The available tags are documented on the function itself.
 
 ```zig
 const print = @import("std").debug.print;
-const SGR = @import("tasai").SGR;
+const SGR = @import("tasai").CSI.SGR;
 
 // Print "hello" in pink (with a hex code) and "world" in bold blue (the blue comes from the 8bit ANSI codes)
 print(SGR.parseString("<f:#ff00ef>hello<r> <f:33><b>world<r><r>\n"), .{});
@@ -51,7 +52,7 @@ While this API is rather overkill it can be rather useful given it includes all*
 
 ```zig
 const print = @import("std").debug.print;
-const SGR = @import("tasai").SGR;
+const SGR = @import("tasai").CSI.SGR;
 
 // // Print "hello" in pink (with a hex code) and "world" in bold blue
 print("{s} {s}\n", .{

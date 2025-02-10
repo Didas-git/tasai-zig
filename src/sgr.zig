@@ -6,7 +6,7 @@ const mem = std.mem;
 
 /// Not all SGR Attributes are supported by all terminals,
 /// it's up for the developer to know which ones work and which don't.
-pub const SGRAttribute = enum(u8) {
+pub const Attribute = enum(u8) {
     Reset,
     Bold,
     Dim,
@@ -99,7 +99,7 @@ pub const SGRAttribute = enum(u8) {
     Background_Bright_White,
 };
 
-pub const SGRModifier = union(enum) {
+pub const Modifier = union(enum) {
     color: union(enum) { foreground: union(enum) {
         @"8bit": u8,
         @"24bit": struct {
@@ -126,10 +126,24 @@ pub const SGRModifier = union(enum) {
             b: u8,
         },
     } },
-    attribute: SGRAttribute,
+    attribute: Attribute,
 };
 
-pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifiers: []const SGRModifier, comptime closing_modifiers: []const SGRModifier) []const u8 {
+/// Due to the simplicity of this function the
+/// 8bit and 24bit color attributes are invalid
+pub fn get(attribute: Attribute) ![]const u8 {
+    const is_invalid = switch (attribute) {
+        .Set_Foreground_Color, .Set_Background_Color, .Set_Underline_Color => true,
+        else => false,
+    };
+
+    if (is_invalid) return error.InvalidAttribute;
+
+    var buf: [16]u8 = undefined;
+    return std.fmt.bufPrint(&buf, FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)}) catch unreachable;
+}
+
+pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifiers: []const Modifier, comptime closing_modifiers: []const Modifier) []const u8 {
     comptime {
         var open: []const u8 = &.{};
         var close: []const u8 = &.{};
@@ -145,7 +159,7 @@ pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifier
     }
 }
 
-fn parseModifiers(buff: *[]const u8, modifiers: []const SGRModifier) void {
+fn parseModifiers(buff: *[]const u8, modifiers: []const Modifier) void {
     for (modifiers) |attribute| {
         switch (attribute) {
             .attribute => |att| buff.* = buff.* ++ fmt.comptimePrint("{d};", .{@intFromEnum(att)}),
@@ -180,28 +194,28 @@ const SGRCode = struct {
 /// as it is intended to be an internal map
 fn CreateAvailableColors(comptime additive: u8) type {
     const close: u8 = switch (additive) {
-        0 => @intFromEnum(SGRAttribute.Default_Foreground_Color),
-        10 => @intFromEnum(SGRAttribute.Default_Background_Color),
+        0 => @intFromEnum(Attribute.Default_Foreground_Color),
+        10 => @intFromEnum(Attribute.Default_Background_Color),
         else => @compileError("Only 0 and 10 are supported additives."),
     };
 
     return struct {
-        const black: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Black) + additive, .close = close };
-        const red: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Red) + additive, .close = close };
-        const green: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Green) + additive, .close = close };
-        const yellow: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Yellow) + additive, .close = close };
-        const blue: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Blue) + additive, .close = close };
-        const magenta: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Magenta) + additive, .close = close };
-        const cyan: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Cyan) + additive, .close = close };
-        const white: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_White) + additive, .close = close };
-        const bBlack: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Black) + additive, .close = close };
-        const bRed: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Red) + additive, .close = close };
-        const bGreen: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Green) + additive, .close = close };
-        const bYellow: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Yellow) + additive, .close = close };
-        const bBlue: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Blue) + additive, .close = close };
-        const bMagenta: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Magenta) + additive, .close = close };
-        const bCyan: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_Cyan) + additive, .close = close };
-        const bWhite: SGRCode = .{ .open = @intFromEnum(SGRAttribute.Foreground_Bright_White) + additive, .close = close };
+        const black: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Black) + additive, .close = close };
+        const red: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Red) + additive, .close = close };
+        const green: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Green) + additive, .close = close };
+        const yellow: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Yellow) + additive, .close = close };
+        const blue: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Blue) + additive, .close = close };
+        const magenta: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Magenta) + additive, .close = close };
+        const cyan: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Cyan) + additive, .close = close };
+        const white: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_White) + additive, .close = close };
+        const bBlack: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Black) + additive, .close = close };
+        const bRed: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Red) + additive, .close = close };
+        const bGreen: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Green) + additive, .close = close };
+        const bYellow: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Yellow) + additive, .close = close };
+        const bBlue: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Blue) + additive, .close = close };
+        const bMagenta: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Magenta) + additive, .close = close };
+        const bCyan: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Cyan) + additive, .close = close };
+        const bWhite: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_White) + additive, .close = close };
         const gray = bBlack;
         const grey = bBlack;
     };
@@ -240,7 +254,7 @@ const BackgroundColors = CreateAvailableColors(10);
 pub inline fn parseString(comptime text: []const u8) []const u8 {
     comptime {
         var final_text: []const u8 = &.{};
-        var stack: []const SGRAttribute = &.{};
+        var stack: []const Attribute = &.{};
         var i: usize = 0;
         var previous_is_token: bool = false;
         // Maybe we should look into using the tokenizer in the std?
@@ -278,40 +292,40 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         stack = stack[0 .. stack.len - 1];
                     },
                     'b' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Bold_Or_Dim});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Bold_Or_Dim});
                         appendAttribute(&final_text, .Bold, previous_is_token);
                     },
                     'd' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Bold_Or_Dim});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Bold_Or_Dim});
                         appendAttribute(&final_text, .Dim, previous_is_token);
                     },
                     'i' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Italic});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Italic});
                         appendAttribute(&final_text, .Italic, previous_is_token);
                     },
                     'u' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Underlined});
                         appendAttribute(&final_text, .Underline, previous_is_token);
                     },
                     's' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Crossed_Out});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Crossed_Out});
                         appendAttribute(&final_text, .Strike_Through, previous_is_token);
                     },
                     'o' => {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Overlined});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Overlined});
                         appendAttribute(&final_text, .Overlined, previous_is_token);
                     },
                     else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
                 },
                 else => {
                     if (mem.eql(u8, token, "du")) {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Underlined});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Underlined});
                         final_text = if (previous_is_token)
-                            final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)})
+                            final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(Attribute.Double_Underline)})
                         else
-                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(SGRAttribute.Double_Underline)});
+                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(Attribute.Double_Underline)});
                     } else if (mem.eql(u8, token, "inv")) {
-                        stack = stack ++ @as([]const SGRAttribute, &.{SGRAttribute.Not_Inverted});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Inverted});
                         appendAttribute(&final_text, .Invert, previous_is_token);
                     } else if (token[0] == 'f') {
                         parseColorAttribute(&final_text, &stack, token, .Set_Foreground_Color, .Default_Foreground_Color, previous_is_token);
@@ -335,10 +349,10 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
 
 fn parseColorAttribute(
     buf: *[]const u8,
-    stack: *[]const SGRAttribute,
+    stack: *[]const Attribute,
     token: []const u8,
-    opening_attribute: SGRAttribute,
-    closing_attribute: SGRAttribute,
+    opening_attribute: Attribute,
+    closing_attribute: Attribute,
     trim_last_byte: bool,
 ) void {
     const color_part = token[2..];
@@ -386,10 +400,10 @@ fn parseColorAttribute(
         append24BitColor(buf, parseStringRGB(color_part), opening_attribute, trim_last_byte);
     }
 
-    stack.* = stack.* ++ @as([]const SGRAttribute, &.{closing_attribute});
+    stack.* = stack.* ++ @as([]const Attribute, &.{closing_attribute});
 }
 
-fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: bool) void {
+fn appendAttribute(buff: *[]const u8, attribute: Attribute, trim_last_byte: bool) void {
     buff.* = if (trim_last_byte)
         buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(attribute)})
     else
@@ -399,7 +413,7 @@ fn appendAttribute(buff: *[]const u8, attribute: SGRAttribute, trim_last_byte: b
 fn append8BitColor(
     buff: *[]const u8,
     color_part: []const u8,
-    open_code: SGRAttribute,
+    open_code: Attribute,
     trim_last_byte: bool,
 ) void {
     const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
@@ -412,7 +426,7 @@ fn append8BitColor(
 fn append24BitColor(
     buff: *[]const u8,
     color: Color,
-    open_code: SGRAttribute,
+    open_code: Attribute,
     trim_last_byte: bool,
 ) void {
     buff.* = if (trim_last_byte)

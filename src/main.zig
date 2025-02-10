@@ -1,5 +1,5 @@
 const std = @import("std");
-const SGR = @import("./sgr.zig");
+const SGR = @import("./csi.zig").SGR;
 const hyperlink = @import("./osc.zig").hyperlink;
 
 pub fn main() !void {
