@@ -17,6 +17,13 @@ pub const CPL = CommandWithAmount('F');
 pub const CHA = CommandWithAmount('G');
 /// Cursor Position
 pub const CUP = CommandWithRPositionalArgs('H');
+
+// TODO: Some of this codes can be "simplified"
+// into more verbose formats that provide a more clear
+// definition of what they are doing
+// It would also remove the function call and
+// Allow them to be merged at comptime using "++"
+
 /// Erase in Display
 pub const ED = CommandWithAmount('J');
 /// Erase in Line
