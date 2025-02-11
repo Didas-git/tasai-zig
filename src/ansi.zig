@@ -76,7 +76,7 @@ pub inline fn comptimeStrip(comptime str: []const u8) []const u8 {
 
         var i: usize = 0;
         while (i < str.len) : (i += 1) {
-            if (ascii.isControl(str[i])) {
+            if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
                 i += parseControlCode(str[i..]);
             }
 
@@ -92,7 +92,7 @@ pub fn strip(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
 
     var i: usize = 0;
     while (i < str.len) : (i += 1) {
-        if (ascii.isControl(str[i])) {
+        if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
             i += parseControlCode(str[i..]);
         }
 
