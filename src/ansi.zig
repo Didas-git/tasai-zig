@@ -1,74 +1,5 @@
 const std = @import("std");
-
-/// https://en.wikipedia.org/wiki/C0_and_C1_control_codes
-pub const ControlCode = enum(u8) {
-    NUL,
-    SOH,
-    STX,
-    ETX,
-    EOT,
-    ENQ,
-    ACK,
-    BEL,
-    BS,
-    HT,
-    LF,
-    VT,
-    FF,
-    CR,
-    SO,
-    SI,
-    DLE,
-    XON,
-    TAPE,
-    XOFF,
-    NTAPE,
-    NAK,
-    SYN,
-    ETB,
-    CAN,
-    EM,
-    SUB,
-    ESC,
-    FS,
-    GS,
-    RS,
-    US,
-    SP,
-    DEL = 127,
-    PAD,
-    HOP,
-    BPH,
-    NBH,
-    IND,
-    NEL,
-    SSA,
-    ESA,
-    HTS,
-    HTJ,
-    VTS,
-    PLD,
-    PLU,
-    RI,
-    SS2,
-    SS3,
-    DCS,
-    PU1,
-    PU2,
-    STS,
-    CCH,
-    MW,
-    SPA,
-    EPA,
-    SOS,
-    SGC,
-    SCI,
-    CSI,
-    ST,
-    OSC,
-    PM,
-    APC,
-};
+const ascii = std.ascii;
 
 /// https://en.wikipedia.org/wiki/ANSI_escape_code#Fe_Escape_sequences
 pub const FeEscapeSequence = struct {
@@ -104,17 +35,12 @@ pub const FpEscapeSequence = struct {
 };
 
 inline fn sequence(comptime char: u8) []const u8 {
-    return std.fmt.comptimePrint("{c}{c}", .{ @intFromEnum(ControlCode.ESC), char });
-}
-
-/// CR, LF, and other whitespace characters are ignored
-pub fn isControlCode(char: u8) bool {
-    return !std.ascii.isWhitespace(char) and (char <= @intFromEnum(ControlCode.SP) or (char >= @intFromEnum(ControlCode.DEL) and char <= @intFromEnum(ControlCode.APC)));
+    return std.fmt.comptimePrint("{c}{c}", .{ ascii.control_code.esc, char });
 }
 
 fn parseControlCode(str: []const u8) usize {
     var i: usize = 0;
-    if (str[i] == @intFromEnum(ControlCode.ESC)) {
+    if (str[i] == ascii.control_code.esc) {
         i += 1;
         switch (str[i]) {
             // CSI
@@ -129,7 +55,7 @@ fn parseControlCode(str: []const u8) usize {
             // OSC
             ']' => {
                 while (true) : (i += 1) {
-                    if (str[i] == @intFromEnum(ControlCode.ESC) and str[i + 1] == '\\') {
+                    if (str[i] == ascii.control_code.esc and str[i + 1] == '\\') {
                         i += 2;
                         break;
                     }
@@ -150,7 +76,7 @@ pub inline fn comptimeStrip(comptime str: []const u8) []const u8 {
 
         var i: usize = 0;
         while (i < str.len) : (i += 1) {
-            if (isControlCode(str[i])) {
+            if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
                 i += parseControlCode(str[i..]);
             }
 
@@ -166,7 +92,7 @@ pub fn strip(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
 
     var i: usize = 0;
     while (i < str.len) : (i += 1) {
-        if (isControlCode(str[i])) {
+        if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
             i += parseControlCode(str[i..]);
         }
 
