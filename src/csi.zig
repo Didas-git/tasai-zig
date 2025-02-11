@@ -47,25 +47,24 @@ pub const CUH = FeEscapeSequence.CSI ++ "?25l";
 /// Select Graphic Rendition
 pub const SGR = @import("./sgr.zig");
 
-fn CommandWithRPositionalArgs(char: u8) fn (first: ?usize, second: ?usize) []const u8 {
+fn CommandWithRPositionalArgs(char: u8) fn (buf: []u8, first: ?usize, second: ?usize) []const u8 {
     const fmt = FeEscapeSequence.CSI ++ "{d};{d}" ++ std.fmt.comptimePrint("{c}", .{char});
     return struct {
-        fn temp(first: ?usize, second: ?usize) []const u8 {
+        fn temp(buf: []u8, first: ?usize, second: ?usize) []const u8 {
             const _first = first orelse 1;
             const _second = second orelse 1;
-            var buf: [32]u8 = undefined;
-            return std.fmt.bufPrint(&buf, fmt, .{ _first, _second }) catch unreachable;
+            return std.fmt.bufPrint(buf, fmt, .{ _first, _second }) catch unreachable;
         }
     }.temp;
 }
 
-fn CommandWithAmount(char: u8) fn (count: ?usize) []const u8 {
+inline fn CommandWithAmount(char: u8) fn (buf: []u8, count: ?usize) []const u8 {
     const fmt = FeEscapeSequence.CSI ++ "{d}" ++ std.fmt.comptimePrint("{c}", .{char});
     return struct {
-        fn temp(count: ?usize) []const u8 {
+        // TODO: There has to be a way to avoid making the user pass a buffer
+        fn temp(buf: []u8, count: ?usize) []const u8 {
             const _count = count orelse 1;
-            var buf: [16]u8 = undefined;
-            return std.fmt.bufPrint(&buf, fmt, .{_count}) catch unreachable;
+            return std.fmt.bufPrint(buf, fmt, .{_count}) catch unreachable;
         }
     }.temp;
 }
