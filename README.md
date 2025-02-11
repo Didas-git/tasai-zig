@@ -4,8 +4,6 @@ Tasai is a zig library that provides multiple comptime utilities to colorize you
 
 Let's make our terminals more colorful (多彩).
 
-###### If you are looking for the javascript/typescript version, it can be found [here](https://github.com/Didas-git/tasai).
-
 # Installation
 
 Tasai is available using the `zig fetch` command.
@@ -47,8 +45,6 @@ print(SGR.parseString("This will print <f:red>\\<<r> in red\n"), .{});
 ## Verbose API
 
 While this API is rather overkill it can be rather useful given it includes all* the SGR codes and is not limited to a few set of them.
-
-###### * all the ones documented [here](https://en.wikipedia.org/wiki/ANSI_escape_code#Select_Graphic_Rendition_parameters).
 
 ```zig
 const print = @import("std").debug.print;
