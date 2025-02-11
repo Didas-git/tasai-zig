@@ -40,31 +40,41 @@ inline fn sequence(comptime char: u8) []const u8 {
 
 fn parseControlCode(str: []const u8) usize {
     var i: usize = 0;
-    if (str[i] == ascii.control_code.esc) {
-        i += 1;
-        switch (str[i]) {
-            // CSI
-            '[' => {
-                while (true) : (i += 1) {
-                    if (str[i] == 'm') {
-                        i += 1;
-                        break;
+    switch (str[i]) {
+        ascii.control_code.esc => {
+            i += 1;
+            switch (str[i]) {
+                // CSI
+                '[' => {
+                    while (true) : (i += 1) {
+                        if (str[i] == 'm') {
+                            i += 1;
+                            break;
+                        }
                     }
-                }
-            },
-            // OSC
-            ']' => {
-                while (true) : (i += 1) {
-                    if (str[i] == ascii.control_code.esc and str[i + 1] == '\\') {
-                        i += 2;
-                        break;
+                },
+                // OSC
+                ']' => {
+                    while (true) : (i += 1) {
+                        if (str[i] == ascii.control_code.esc and str[i + 1] == '\\') {
+                            i += 2;
+                            break;
+                        }
                     }
-                }
-            },
-            // TODO: See if optimizations can be done here
-            'N', 'O', 'P', '\\', 'X', '^', '_' => {},
-            else => {},
-        }
+                },
+                // TODO: See if optimizations can be done here
+                'N', 'O', 'P', '\\', 'X', '^', '_' => {},
+                else => {},
+            }
+        },
+        ' ',
+        ascii.control_code.ht,
+        ascii.control_code.lf,
+        ascii.control_code.cr,
+        ascii.control_code.vt,
+        ascii.control_code.ff,
+        => return 0,
+        else => return 1,
     }
 
     return i;
@@ -76,7 +86,7 @@ pub inline fn comptimeStrip(comptime str: []const u8) []const u8 {
 
         var i: usize = 0;
         while (i < str.len) : (i += 1) {
-            if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
+            if (ascii.isControl(str[i])) {
                 i += parseControlCode(str[i..]);
             }
 
@@ -92,7 +102,7 @@ pub fn strip(allocator: std.mem.Allocator, str: []const u8) ![]const u8 {
 
     var i: usize = 0;
     while (i < str.len) : (i += 1) {
-        if (!std.ascii.isWhitespace(str[i]) and ascii.isControl(str[i])) {
+        if (ascii.isControl(str[i])) {
             i += parseControlCode(str[i..]);
         }
 
