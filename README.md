@@ -45,17 +45,47 @@ try writer.print("Answer: {any}\n", .{answer});
 
 ### Select Prompt
 
+#### Using Strings
+
 ```zig
 const prompts = @import("tasai").prompts;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
-const prompt = prompts.SelectPrompt(.{ 
+const prompt = prompts.SelectPrompt([]const u8, .{ 
     .message = "Pick one", 
     .choices = &.{
         "Apples",
         "Oranges",
         "Grapes",
+    }, 
+});
+
+const std_out = std.io.getStdOut();
+const answer = try prompt.run(allocator);
+const writer = std_out.writer();
+
+try writer.print("Answer: {s}\n", .{answer});
+```
+
+#### Using Key-Value pairs
+
+Using key value pairs allows you to display a message and get a completely different output from it the selection.
+
+```zig
+const tasai = @import("tasai");
+const prompts = tasai.prompts;
+
+const StringKV = tasai.KV([]const u8);
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
+const prompt = prompts.SelectPrompt(StringKV, .{ 
+    .message = "Pick one", 
+    .choices = &.{
+        .{ .name = "Apple", .value = "I Love Apples" },
+        .{ .name = "Orange", .value = "I Love Oranges" },
+        .{ .name = "Grape", .value = "I Love Grapes" },
     }, 
 });
 
