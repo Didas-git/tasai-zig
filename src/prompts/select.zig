@@ -12,7 +12,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     arrow: []const u8 = "\u{25b8}",
 }) type {
     std.debug.assert(options.message.len > 0);
-    std.debug.assert(options.limit > 0);
+    std.debug.assert(options.limit > 1);
 
     const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r>"), .{
         options.header[0],
