@@ -40,7 +40,7 @@ const std_out = std.io.getStdOut();
 const answer = try prompt.run(allocator);
 const writer = std_out.writer();
 
-try writer.print("Answer: {s}\n", .{if (answer) "true" else "false"});
+try writer.print("Answer: {any}\n", .{answer});
 ```
 
 ### Select Prompt
