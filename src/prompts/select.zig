@@ -37,7 +37,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             const writer = term.stdout.writer();
 
             try writer.writeAll(CSI.CUH ++ parsed_question_before ++ CSI.C_CNL(1));
-            try render(true);
+            try render();
 
             const answer = try term.readInput(T, handler);
             try term.deinit();
@@ -53,22 +53,26 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
                 std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
                 252 => {
                     move(-1);
-                    try render(false);
+                    try clearChoices();
+                    try render();
                     return null;
                 },
                 253 => {
                     move(1);
-                    try render(false);
+                    try clearChoices();
+                    try render();
                     return null;
                 },
                 254 => {
                     i = 0;
-                    try render(false);
+                    try clearChoices();
+                    try render();
                     return null;
                 },
                 255 => {
                     i = options.choices.len - 1;
-                    try render(false);
+                    try clearChoices();
+                    try render();
                     return null;
                 },
                 else => null,
@@ -81,13 +85,13 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             i = @intCast(@as(isize, @intCast(i)) + x);
         }
 
-        fn render(init: bool) !void {
+        fn clearChoices() !void {
+            try term.stdout.writeAll(CSI.C_CPL(options.choices.len - 1) ++ CSI.C_ED(0));
+        }
+
+        fn render() !void {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
             const writer = term.stdout.writer();
-
-            if (!init) {
-                try term.stdout.writeAll(CSI.C_CPL(options.choices.len - 1) ++ CSI.C_ED(0));
-            }
 
             for (options.choices, 0..) |choice, x| {
                 if (x == i) {
