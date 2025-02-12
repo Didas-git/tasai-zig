@@ -6,7 +6,7 @@ const RawTerminal = @import("../terminal.zig").RawTerminal;
 pub fn ConfirmPrompt(comptime options: struct {
     message: []const u8,
     default_value: bool = false,
-    header: [2][]const u8 = .{ "?", "\u{2714}" },
+    header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
 }) type {
     std.debug.assert(options.message.len > 0);

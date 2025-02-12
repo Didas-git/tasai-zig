@@ -20,7 +20,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     message: []const u8,
     choices: []const T,
     limit: u8 = 10,
-    header: [2][]const u8 = .{ "?", "\u{2714}" },
+    header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
     footer: [2][]const u8 = .{ "...", "\u{00b7}" },
     arrow: []const u8 = "\u{25b8}",
 }) type {
