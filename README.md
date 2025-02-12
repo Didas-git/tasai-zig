@@ -32,15 +32,38 @@ exe.root_module.addImport("tasai", tasai.module("tasai"));
 ```zig
 const prompts = @import("tasai").prompts;
 
-var buf: [64]u8 = undefined;
-var fba2 = std.heap.FixedBufferAllocator.init(&buf);
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
 const prompt = prompts.ConfirmPrompt(.{ .message = "Are you alive?" });
 
 const std_out = std.io.getStdOut();
-const answer = try prompt.run(fba2.allocator());
+const answer = try prompt.run(allocator);
 const writer = std_out.writer();
 
 try writer.print("Answer: {s}\n", .{if (answer) "true" else "false"});
+```
+
+### Select Prompt
+
+```zig
+const prompts = @import("tasai").prompts;
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
+const prompt = prompts.SelectPrompt(.{ 
+    .message = "Pick one", 
+    .choices = &.{
+        "Apples",
+        "Oranges",
+        "Grapes,
+    }, 
+});
+
+const std_out = std.io.getStdOut();
+const answer = try prompt.run(allocator);
+const writer = std_out.writer();
+
+try writer.print("Answer: {s}\n", .{answer});
 ```
 
 ## Coloring
