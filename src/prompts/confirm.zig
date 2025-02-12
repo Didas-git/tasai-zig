@@ -9,9 +9,7 @@ pub fn ConfirmPrompt(comptime options: struct {
     header: [2][]const u8 = .{ "?", "\u{2714}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
 }) type {
-    if (options.message.len == 0) {
-        @compileError("You need to provide a question to ask");
-    }
+    std.debug.assert(options.message.len > 0);
 
     const visual_options = if (options.default_value) "(Y/n)" else "(y/N)";
     const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s} {s}<r> <f:cyan>{s}<r>"), .{
