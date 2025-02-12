@@ -11,9 +11,8 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     footer: [2][]const u8 = .{ "...", "\u{00b7}" },
     arrow: []const u8 = "\u{25b8}",
 }) type {
-    if (options.message.len == 0) {
-        @compileError("You need to provide a question to ask");
-    }
+    std.debug.assert(options.message.len > 0);
+    std.debug.assert(options.limit > 0);
 
     const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r>"), .{
         options.header[0],
@@ -26,9 +25,13 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         options.footer[1],
     });
 
+    const V = @Vector(2, usize);
+
     return struct {
         var term: RawTerminal(true) = undefined;
         var i: usize = 0;
+        var current_block: V = .{ 0, options.limit };
+
         pub fn run(allocator: std.mem.Allocator) !T {
             term = try RawTerminal(true).init(allocator);
 
@@ -81,6 +84,10 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             if (i == 0 and x == -1) return;
             if (i == options.choices.len - 1 and x >= 1) return;
             i = @intCast(@as(isize, @intCast(i)) + x);
+            if (i < current_block[0]) {
+                current_block = current_block - @as(V, @splat(1));
+            } else if (i + 1 > current_block[1]) current_block = current_block + @as(V, @splat(1));
+
             try clearChoices();
             try render();
         }
@@ -94,21 +101,16 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
             const writer = term.stdout.writer();
 
-            const choices, const start = blk: {
-                if (options.choices.len <= options.limit) break :blk .{ options.choices, @as(usize, 0) };
-                if (i < options.limit) break :blk .{ options.choices[0..options.limit], @as(usize, 0) };
-                const extra = i + 1 - options.limit;
-                break :blk .{ options.choices[@as(usize, @intCast(extra)) .. i + 1], @as(usize, @intCast(extra)) };
-            };
+            const block_start, const block_end = current_block;
 
-            for (choices, start..) |choice, x| {
+            for (options.choices[block_start..block_end], block_start..) |choice, x| {
                 if (x == i) {
                     try writer.print(selected, .{choice});
                 } else {
                     try writer.print("  {s}", .{choice});
                 }
 
-                if (x != choices.len - 1 + start) {
+                if (x != options.limit - 1 + block_start) {
                     try writer.writeAll(CSI.C_CNL(1));
                 }
             }
