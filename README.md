@@ -55,7 +55,7 @@ const prompt = prompts.SelectPrompt(.{
     .choices = &.{
         "Apples",
         "Oranges",
-        "Grapes,
+        "Grapes",
     }, 
 });
 
