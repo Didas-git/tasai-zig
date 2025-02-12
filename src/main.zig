@@ -1,5 +1,6 @@
 const std = @import("std");
 const tasai = @import("./tasai.zig");
+const InputPrompt = @import("./prompts/input.zig").InputPrompt;
 const SelectPrompt = @import("./prompts/select.zig").SelectPrompt;
 const ConfirmPrompt = @import("./prompts/confirm.zig").ConfirmPrompt;
 
@@ -8,6 +9,9 @@ const OSC = tasai.OSC;
 const CSI = tasai.CSI;
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
     std.debug.print("{s}: {s}!\n", .{
         CSI.SGR.verboseFormat("Test", &.{
             .{ .attribute = .Double_Underline },
@@ -43,13 +47,10 @@ pub fn main() !void {
 
     std.debug.print("{s}\n", .{tasai.comptimeStrip(str)});
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
     std.debug.print("{s}\n", .{try tasai.strip(allocator, str)});
 
-    const std_out = std.io.getStdOut();
-    const writer = std_out.writer();
+    const stdout = std.io.getStdOut();
+    const writer = stdout.writer();
 
     const c_p = ConfirmPrompt(.{ .message = "Are you alive?" });
     const answer1 = try c_p.run(allocator);
@@ -111,4 +112,30 @@ pub fn main() !void {
 
     const answer4 = try s_p3.run(allocator);
     try writer.print("Answer: {any}\n", .{answer4});
+
+    const i_p = InputPrompt([]const u8, .{ .message = "What's your name?" });
+
+    const answer5 = try i_p.run(allocator);
+    try writer.print("Answer: {s}\n", .{answer5});
+
+    const i_p2 = InputPrompt([]const u8, .{
+        .message = "What's your password?",
+        .password = true,
+    });
+
+    const answer6 = try i_p2.run(allocator);
+    try writer.print("Answer: {s}\n", .{answer6});
+
+    const i_p3 = InputPrompt(u8, .{ .message = "How old are you?" });
+
+    const answer7 = try i_p3.run(allocator);
+    try writer.print("Answer: {d}\n", .{answer7});
+
+    const i_p4 = InputPrompt(f32, .{
+        .message = "Give me a number",
+        .invisible = true,
+    });
+
+    const answer8 = try i_p4.run(allocator);
+    try writer.print("Answer: {d}\n", .{answer8});
 }

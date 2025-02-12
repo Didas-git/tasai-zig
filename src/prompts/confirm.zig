@@ -41,7 +41,7 @@ pub fn ConfirmPrompt(comptime options: struct {
             try term.deinit();
 
             try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
-            try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ parsed_question_after, if (answer) "true" else "false" });
+            try writer.print(CSI.SGR.parseString("{s}<f:green>{any}<r>\n"), .{ parsed_question_after, answer });
 
             return answer;
         }
@@ -55,23 +55,4 @@ pub fn ConfirmPrompt(comptime options: struct {
             };
         }
     };
-}
-
-fn contains(comptime T: type, table: []const []const T, search: []const T) bool {
-    for (table) |item| {
-        if (std.mem.eql(T, item, search)) return true;
-    }
-
-    return false;
-}
-
-inline fn divideIntoPossibilities(comptime word: []const u8) []const []const u8 {
-    comptime {
-        var buf: []const []const u8 = &.{};
-        for (word, 1..) |_, i| {
-            buf = buf ++ .{word[0..i]};
-        }
-
-        return buf;
-    }
 }

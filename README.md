@@ -27,6 +27,25 @@ exe.root_module.addImport("tasai", tasai.module("tasai"));
 
 ## Prompting
 
+### Input Prompt
+
+Input prompts are very versatile and work with both strings and numbers (ints and floats).
+They can be made "invisible" (doesn't show what the user is currently typing) and also work as password input by setting the respective options.
+
+```zig
+const prompts = @import("tasai").prompts;
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
+const prompt = prompts.Input([]const u8, .{ .message = "Who are you?" });
+
+const std_out = std.io.getStdOut();
+const answer = try prompt.run(allocator);
+const writer = std_out.writer();
+
+try writer.print("Answer: {any}\n", .{answer});
+```
+
 ### Confirm Prompt
 
 ```zig
