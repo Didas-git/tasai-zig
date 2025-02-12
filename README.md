@@ -25,9 +25,29 @@ exe.root_module.addImport("tasai", tasai.module("tasai"));
 
 # Usage
 
-Tasai provides 2 different comptime apis
+## Prompting
 
-## String API
+### Confirm Prompt
+
+```zig
+const prompts = @import("tasai").prompts;
+
+var buf: [64]u8 = undefined;
+var fba2 = std.heap.FixedBufferAllocator.init(&buf);
+const prompt = prompts.ConfirmPrompt(.{ .message = "Are you alive?" });
+
+const std_out = std.io.getStdOut();
+const answer = try prompt.run(fba2.allocator());
+const writer = std_out.writer();
+
+try writer.print("Answer: {s}\n", .{if (answer) "true" else "false"});
+```
+
+## Coloring
+
+Tasai provides 2 different comptime-only apis for dealing with colors.
+
+### String API
 
 The available tags are documented on the function itself.
 
@@ -35,14 +55,15 @@ The available tags are documented on the function itself.
 const print = @import("std").debug.print;
 const SGR = @import("tasai").CSI.SGR;
 
-// Print "hello" in pink (with a hex code) and "world" in bold blue (the blue comes from the 8bit ANSI codes)
+// Print "hello" in pink (with a hex code)
+// and "world" in bold blue (the blue comes from the 8bit ANSI codes)
 print(SGR.parseString("<f:#ff00ef>hello<r> <f:33><b>world<r><r>\n"), .{});
 
 // Escaping '<'
 print(SGR.parseString("This will print <f:red>\\<<r> in red\n"), .{});
 ```
 
-## Verbose API
+### Verbose API
 
 While this API is rather overkill it can be rather useful given it includes all* the SGR codes and is not limited to a few set of them.
 
@@ -50,7 +71,7 @@ While this API is rather overkill it can be rather useful given it includes all*
 const print = @import("std").debug.print;
 const SGR = @import("tasai").CSI.SGR;
 
-// // Print "hello" in pink (with a hex code) and "world" in bold blue
+// Print "hello" in pink (with a hex code) and "world" in bold blue
 print("{s} {s}\n", .{
     SGR.verboseFormat("Hello", &.{
             .{ .Color = .{ .Foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
