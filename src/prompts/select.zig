@@ -107,22 +107,3 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         }
     };
 }
-
-fn contains(comptime T: type, table: []const []const T, search: []const T) bool {
-    for (table) |item| {
-        if (std.mem.eql(T, item, search)) return true;
-    }
-
-    return false;
-}
-
-inline fn divideIntoPossibilities(comptime word: []const u8) []const []const u8 {
-    comptime {
-        var buf: []const []const u8 = &.{};
-        for (word, 1..) |_, i| {
-            buf = buf ++ .{word[0..i]};
-        }
-
-        return buf;
-    }
-}
