@@ -131,16 +131,27 @@ pub const Modifier = union(enum) {
 
 /// Due to the simplicity of this function the
 /// 8bit and 24bit color attributes are invalid
-pub fn get(attribute: Attribute) ![]const u8 {
+pub fn get(buf: []u8, attribute: Attribute) ![]const u8 {
     const is_invalid = switch (attribute) {
         .Set_Foreground_Color, .Set_Background_Color, .Set_Underline_Color => true,
         else => false,
     };
 
     if (is_invalid) return error.InvalidAttribute;
+    return std.fmt.bufPrint(buf, FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)}) catch unreachable;
+}
 
-    var buf: [16]u8 = undefined;
-    return std.fmt.bufPrint(&buf, FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)}) catch unreachable;
+/// Due to the simplicity of this function the
+/// 8bit and 24bit color attributes are invalid
+pub inline fn comptimeGet(comptime attribute: Attribute) []const u8 {
+    const is_invalid = switch (attribute) {
+        .Set_Foreground_Color, .Set_Background_Color, .Set_Underline_Color => true,
+        else => false,
+    };
+
+    if (is_invalid) @compileError("Invalid Attribute.");
+
+    return std.fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)});
 }
 
 pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifiers: []const Modifier, comptime closing_modifiers: []const Modifier) []const u8 {
@@ -190,6 +201,7 @@ const SGRCode = struct {
     open: u8,
     close: u8,
 };
+
 /// This structure does not follow naming conventions
 /// as it is intended to be an internal map
 fn CreateAvailableColors(comptime additive: u8) type {
@@ -223,6 +235,7 @@ fn CreateAvailableColors(comptime additive: u8) type {
 
 const ForegroundColors = CreateAvailableColors(0);
 const BackgroundColors = CreateAvailableColors(10);
+
 /// Currently supported tokens:
 /// - Normal Attributes:
 ///     - `r` - Smart Reset

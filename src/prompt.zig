@@ -1,5 +1,4 @@
 const std = @import("std");
-const CSI = @import("./csi.zig");
 const Cursor = @import("./Cursor.zig");
 
 pub fn RawTerminal(comptime handle_control_codes: bool) type {
