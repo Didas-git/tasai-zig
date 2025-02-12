@@ -1,6 +1,63 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
 const Cursor = @import("../Cursor.zig");
+const RawTerminal = @import("../terminal.zig").RawTerminal;
+
+pub fn ConfirmPrompt(comptime options: struct {
+    message: []const u8,
+    default_value: bool = false,
+    header: [2][]const u8 = .{ "?", "\u{2714}" },
+    footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
+}) type {
+    if (options.message.len == 0) {
+        @compileError("You need to provide a question to ask");
+    }
+
+    const visual_options = if (options.default_value) "(Y/n)" else "(y/N)";
+    const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s} {s}<r> <f:cyan>{s}<r>"), .{
+        options.header[0],
+        options.message,
+        visual_options,
+        options.footer[0],
+        if (options.default_value) "true" else "false",
+    });
+    const parsed_question_after = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s} {s}<r> "), .{
+        options.header[1],
+        options.message,
+        visual_options,
+        options.footer[1],
+    });
+
+    return struct {
+        pub fn run(allocator: std.mem.Allocator) !bool {
+            const term = try RawTerminal(true).init(allocator);
+
+            try term.stdout.lock(.none);
+            defer term.stdout.unlock();
+
+            const writer = term.stdout.writer();
+
+            try writer.writeAll(CSI.CUH ++ parsed_question_before);
+
+            const answer = try term.readInput(bool, handler);
+            try term.deinit();
+
+            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
+            try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ parsed_question_after, if (answer) "true" else "false" });
+
+            return answer;
+        }
+
+        fn handler(byte: u8) !?bool {
+            return switch (byte) {
+                std.ascii.control_code.lf, std.ascii.control_code.cr => options.default_value,
+                'y', 'Y' => true,
+                'n', 'N' => true,
+                else => null,
+            };
+        }
+    };
+}
 
 fn contains(comptime T: type, table: []const []const T, search: []const T) bool {
     for (table) |item| {
@@ -19,59 +76,4 @@ inline fn divideIntoPossibilities(comptime word: []const u8) []const []const u8 
 
         return buf;
     }
-}
-
-pub fn ConfirmPrompt(comptime options: struct {
-    message: []const u8,
-    allow_long_answer: bool = false,
-}) type {
-    if (options.message.len == 0) {
-        @compileError("You need to provide a question to ask");
-    }
-
-    const parsed_question = std.fmt.comptimePrint(CSI.SGR.parseString("{s} <d>(y/N) ><r> "), .{options.message});
-
-    const y_table: []const []const u8 = divideIntoPossibilities("yes") ++ divideIntoPossibilities("true");
-    const n_table: []const []const u8 = divideIntoPossibilities("no") ++ divideIntoPossibilities("false");
-
-    return struct {
-        pub fn run(allocator: std.mem.Allocator) !bool {
-            const std_out = std.io.getStdOut();
-            const reader_interface = std.io.getStdIn().reader();
-
-            try std_out.lock(.none);
-            defer std_out.unlock();
-
-            const writer = std_out.writer();
-            var cursor: Cursor = .{};
-
-            try writer.writeAll(cursor.hide());
-            try writer.print(parsed_question, .{});
-
-            const possible_answer = try reader_interface.readUntilDelimiterOrEofAlloc(allocator, '\n', 4096);
-            try writer.writeAll(cursor.show());
-
-            if (possible_answer) |answer| {
-                if (options.allow_long_answer) {
-                    if (answer.len > 1) {
-                        for (answer) |*char| {
-                            char.* = std.ascii.toLower(char.*);
-                        }
-
-                        if (contains(u8, y_table, answer)) return true;
-                        if (contains(u8, n_table, answer)) return false;
-                        return error.InvalidAnswer;
-                    }
-                } else if (answer.len != 1) return error.InvalidAnswerLength;
-
-                return switch (answer[0]) {
-                    'y', 'Y' => true,
-                    'n', 'N' => false,
-                    else => error.InvalidAnswer,
-                };
-            }
-
-            return error.NoAnswer;
-        }
-    };
 }

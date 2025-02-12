@@ -1,4 +1,5 @@
 const std = @import("std");
+const CSI = @import("./csi.zig");
 const Cursor = @import("./Cursor.zig");
 
 pub fn RawTerminal(comptime handle_control_codes: bool) type {
@@ -49,22 +50,49 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
         }
 
         pub fn deinit(self: RawTerminal(handle_control_codes)) !void {
+            try self.stdout.writeAll(CSI.CUS);
             try std.posix.tcsetattr(self.tty.handle, .NOW, self.termios);
         }
 
+        /// The handler has 4 bytes as special cases:
+        /// 252 - Arrow Up (ESC A | ESC[A | ESC O A)
+        /// 253 - Arrow Down (ESC B | ESC[B | ESC O B)
+        /// 254 - Arrow Right (ESC C | ESC[C | ESC O C)
+        /// 255 - Arrow Left (ESC D | ESC[D | ESC O D)
         pub fn readInput(self: RawTerminal(handle_control_codes), comptime T: type, handler: fn (byte: u8) anyerror!?T) !T {
             var poller = std.io.poll(self.alloc, enum { stdin }, .{ .stdin = self.stdin });
             defer poller.deinit();
 
-            const isReady = try poller.poll();
-            if (!isReady) return error.FailedToPoll;
-
             var buf: [8]u8 = undefined;
             while (true) {
+                const isReady = try poller.poll();
+                if (!isReady) return error.FailedToPoll;
                 const bytes = poller.fifo(.stdin).read(&buf);
-                if (bytes > 1) return error.SomethingWentTerriblyWrong;
 
-                if (handle_control_codes) {
+                if (bytes > 1) {
+                    if (buf[0] == std.ascii.control_code.esc) {
+                        const byte = switch (buf[1]) {
+                            'A' => @as(u8, 252),
+                            'B' => @as(u8, 253),
+                            'C' => @as(u8, 254),
+                            'D' => @as(u8, 255),
+                            '[', 'O' => switch (buf[2]) {
+                                'A' => @as(u8, 252),
+                                'B' => @as(u8, 253),
+                                'C' => @as(u8, 254),
+                                'D' => @as(u8, 255),
+                                else => return error.UnsupportedEscapeCode,
+                            },
+                            else => return error.UnsupportedEscapeCode,
+                        };
+
+                        if (try handler(byte)) |val| {
+                            return val;
+                        }
+                    } else {
+                        return error.UnsupportedValue;
+                    }
+                } else if (handle_control_codes) {
                     switch (buf[0]) {
                         std.ascii.control_code.etx => {
                             try self.deinit();
