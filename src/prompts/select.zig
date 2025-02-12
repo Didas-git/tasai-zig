@@ -6,6 +6,7 @@ const RawTerminal = @import("../terminal.zig").RawTerminal;
 pub fn SelectPrompt(comptime T: type, comptime options: struct {
     message: []const u8,
     choices: []const T,
+    limit: u8 = 10,
     header: [2][]const u8 = .{ "?", "\u{2714}" },
     footer: [2][]const u8 = .{ "...", "\u{00b7}" },
     arrow: []const u8 = "\u{25b8}",
@@ -42,7 +43,8 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             const answer = try term.readInput(T, handler);
             try term.deinit();
 
-            try writer.writeAll(CSI.C_CPL(options.choices.len) ++ CSI.C_ED(0));
+            const to_clear = if (comptime options.choices.len <= options.limit) options.choices.len else options.limit;
+            try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
             try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ parsed_question_after, answer });
 
             return answer;
@@ -52,25 +54,21 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             return switch (byte) {
                 std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
                 252 => {
-                    move(-1);
-                    try clearChoices();
-                    try render();
+                    try move(-1);
                     return null;
                 },
                 253 => {
-                    move(1);
-                    try clearChoices();
-                    try render();
+                    try move(1);
                     return null;
                 },
                 254 => {
-                    i = 0;
+                    i = options.choices.len - 1;
                     try clearChoices();
                     try render();
                     return null;
                 },
                 255 => {
-                    i = options.choices.len - 1;
+                    i = 0;
                     try clearChoices();
                     try render();
                     return null;
@@ -79,28 +77,38 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             };
         }
 
-        fn move(x: isize) void {
+        fn move(x: isize) !void {
             if (i == 0 and x == -1) return;
             if (i == options.choices.len - 1 and x >= 1) return;
             i = @intCast(@as(isize, @intCast(i)) + x);
+            try clearChoices();
+            try render();
         }
 
         fn clearChoices() !void {
-            try term.stdout.writeAll(CSI.C_CPL(options.choices.len - 1) ++ CSI.C_ED(0));
+            const to_clear = if (comptime options.choices.len <= options.limit) options.choices.len - 1 else options.limit - 1;
+            try term.stdout.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
         }
 
         fn render() !void {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
             const writer = term.stdout.writer();
 
-            for (options.choices, 0..) |choice, x| {
+            const choices, const start = blk: {
+                if (options.choices.len <= options.limit) break :blk .{ options.choices, @as(usize, 0) };
+                if (i < options.limit) break :blk .{ options.choices[0..options.limit], @as(usize, 0) };
+                const extra = i + 1 - options.limit;
+                break :blk .{ options.choices[@as(usize, @intCast(extra)) .. i + 1], @as(usize, @intCast(extra)) };
+            };
+
+            for (choices, start..) |choice, x| {
                 if (x == i) {
                     try writer.print(selected, .{choice});
                 } else {
                     try writer.print("  {s}", .{choice});
                 }
 
-                if (x != options.choices.len - 1) {
+                if (x != choices.len - 1 + start) {
                     try writer.writeAll(CSI.C_CNL(1));
                 }
             }
