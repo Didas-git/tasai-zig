@@ -1,6 +1,5 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const Cursor = @import("../Cursor.zig");
 const RawTerminal = @import("../terminal.zig").RawTerminal;
 
 fn isKV(comptime T: type) bool {
@@ -29,12 +28,12 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     std.debug.assert(options.limit > 1);
     std.debug.assert(T == []const u8 or isKV(T));
 
-    const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r>"), .{
+    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r>"), .{
         options.header[0],
         options.message,
         options.footer[0],
     });
-    const parsed_question_after = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
+    const done = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
         options.header[1],
         options.message,
         options.footer[1],
@@ -56,7 +55,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
 
             const writer = term.stdout.writer();
 
-            try writer.writeAll(CSI.CUH ++ parsed_question_before ++ CSI.C_CNL(1));
+            try writer.writeAll(CSI.CUH ++ ask ++ CSI.C_CNL(1));
             try render();
 
             const answer = try term.readInput(T, handler);
@@ -65,10 +64,10 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             const to_clear = if (comptime options.choices.len < options.limit) options.choices.len + 1 else options.limit;
             try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
             if (comptime isKV(T)) {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ parsed_question_after, answer.name });
+                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer.name });
                 return answer.value;
             } else {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ parsed_question_after, answer });
+                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer });
                 return answer;
             }
         }

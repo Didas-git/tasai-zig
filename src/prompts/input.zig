@@ -1,6 +1,5 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const Cursor = @import("../Cursor.zig");
 const RawTerminal = @import("../terminal.zig").RawTerminal;
 
 pub fn InputPrompt(comptime T: type, comptime options: struct {
@@ -26,12 +25,12 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         std.debug.assert(T == []const u8);
     }
 
-    const parsed_question_before = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.comptimeGet(.Dim) else ""), .{
+    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.comptimeGet(.Dim) else ""), .{
         options.header[0],
         options.message,
         options.footer[0],
     });
-    const parsed_question_after = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
+    const done = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
         options.header[1],
         options.message,
         options.footer[1],
@@ -51,7 +50,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
             const writer = term.stdout.writer();
 
-            try writer.writeAll(CSI.CUH ++ parsed_question_before);
+            try writer.writeAll(CSI.CUH ++ ask);
 
             const answer = try term.readInput([]const u8, handler);
             try term.deinit();
@@ -61,7 +60,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 for (answer) |_| {
                     try arr.append(options.password_placeholder);
                 }
-                try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ parsed_question_after, try arr.toOwnedSlice() });
+                try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try arr.toOwnedSlice() });
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
                     .Int => try std.fmt.parseInt(T, answer, 10),
@@ -70,17 +69,17 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 };
 
                 if (comptime options.invisible) {
-                    try writer.writeAll(parsed_question_after ++ "\n");
+                    try writer.writeAll(done ++ "\n");
                 } else {
-                    try writer.print(CSI.SGR.parseString("{s}<f:cyan>{d}<r>\n"), .{ parsed_question_after, num });
+                    try writer.print(CSI.SGR.parseString("{s}<f:cyan>{d}<r>\n"), .{ done, num });
                 }
 
                 return num;
             } else {
                 if (comptime options.invisible) {
-                    try writer.writeAll(parsed_question_after ++ "\n");
+                    try writer.writeAll(done ++ "\n");
                 } else {
-                    try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ parsed_question_after, answer });
+                    try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ done, answer });
                 }
             }
 

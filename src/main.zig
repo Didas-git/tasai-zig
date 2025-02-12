@@ -56,6 +56,13 @@ pub fn main() !void {
     const answer1 = try c_p.run(allocator);
     try writer.print("Answer: {any}\n", .{answer1});
 
+    const c_p2 = ConfirmPrompt(.{
+        .message = "Are you alive?",
+        .toggle = true,
+    });
+    const answer9 = try c_p2.run(allocator);
+    try writer.print("Answer: {any}\n", .{answer9});
+
     const s_p = SelectPrompt([]const u8, .{
         .message = "Pick",
         .choices = &.{
