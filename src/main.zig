@@ -1,9 +1,11 @@
 const std = @import("std");
-const OSC = @import("./osc.zig");
-const ANSI = @import("./ansi.zig");
-const CSI = @import("./csi.zig");
-const ConfirmPrompt = @import("./prompts/confirm.zig").ConfirmPrompt;
+const tasai = @import("./tasai.zig");
 const SelectPrompt = @import("./prompts/select.zig").SelectPrompt;
+const ConfirmPrompt = @import("./prompts/confirm.zig").ConfirmPrompt;
+
+const KV = tasai.KV;
+const OSC = tasai.OSC;
+const CSI = tasai.CSI;
 
 pub fn main() !void {
     std.debug.print("{s}: {s}!\n", .{
@@ -39,12 +41,12 @@ pub fn main() !void {
     std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
     std.debug.print("{s}\n", .{CSI.SGR.parseString("<b:hsi:0,0,0><f:hsv:0,255,255>Hello<r> <f:hsl:0.1,1,0.5>World<r><r>")});
 
-    std.debug.print("{s}\n", .{ANSI.comptimeStrip(str)});
+    std.debug.print("{s}\n", .{tasai.comptimeStrip(str)});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    std.debug.print("{s}\n", .{try ANSI.strip(allocator, str)});
+    std.debug.print("{s}\n", .{try tasai.strip(allocator, str)});
 
     const std_out = std.io.getStdOut();
     const writer = std_out.writer();
@@ -81,4 +83,32 @@ pub fn main() !void {
 
     const answer2 = try s_p.run(allocator);
     try writer.print("Answer: {s}\n", .{answer2});
+
+    const StringKV = KV([]const u8);
+
+    const s_p2 = SelectPrompt(StringKV, .{
+        .message = "Pick",
+        .choices = &.{
+            .{ .name = "Apple", .value = "I Love Apples" },
+            .{ .name = "Orange", .value = "I Love Oranges" },
+            .{ .name = "Grape", .value = "I Love Grapes" },
+        },
+    });
+
+    const answer3 = try s_p2.run(allocator);
+    try writer.print("Answer: {s}\n", .{answer3});
+
+    const BooleanKV = KV(bool);
+
+    const s_p3 = SelectPrompt(BooleanKV, .{
+        .message = "Pick",
+        .choices = &.{
+            .{ .name = "Apple", .value = false },
+            .{ .name = "Orange", .value = true },
+            .{ .name = "Grape", .value = false },
+        },
+    });
+
+    const answer4 = try s_p3.run(allocator);
+    try writer.print("Answer: {any}\n", .{answer4});
 }
