@@ -53,14 +53,14 @@ pub fn main() !void {
     const writer = stdout.writer();
 
     const c_p = ConfirmPrompt(.{ .message = "Are you alive?" });
-    const answer1 = try c_p.run(allocator);
+    const answer1 = try c_p.run();
     try writer.print("Answer: {any}\n", .{answer1});
 
     const c_p2 = ConfirmPrompt(.{
         .message = "Are you alive?",
         .toggle = true,
     });
-    const answer9 = try c_p2.run(allocator);
+    const answer9 = try c_p2.run();
     try writer.print("Answer: {any}\n", .{answer9});
 
     const s_p = SelectPrompt([]const u8, .{
@@ -89,7 +89,7 @@ pub fn main() !void {
         },
     });
 
-    const answer2 = try s_p.run(allocator);
+    const answer2 = try s_p.run();
     try writer.print("Answer: {s}\n", .{answer2});
 
     const StringKV = KV([]const u8);
@@ -103,7 +103,7 @@ pub fn main() !void {
         },
     });
 
-    const answer3 = try s_p2.run(allocator);
+    const answer3 = try s_p2.run();
     try writer.print("Answer: {s}\n", .{answer3});
 
     const BooleanKV = KV(bool);
@@ -117,7 +117,7 @@ pub fn main() !void {
         },
     });
 
-    const answer4 = try s_p3.run(allocator);
+    const answer4 = try s_p3.run();
     try writer.print("Answer: {any}\n", .{answer4});
 
     const i_p = InputPrompt([]const u8, .{ .message = "What's your name?" });

@@ -41,7 +41,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         var arr: std.ArrayList(u8) = undefined;
 
         pub fn run(allocator: std.mem.Allocator) !T {
-            term = try RawTerminal(true).init(allocator);
+            term = try RawTerminal(true).init();
             arr = std.ArrayList(u8).init(allocator);
             defer arr.deinit();
 

@@ -47,8 +47,8 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         var i: usize = 0;
         var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
 
-        pub fn run(allocator: std.mem.Allocator) !ReturnType {
-            term = try RawTerminal(true).init(allocator);
+        pub fn run() !ReturnType {
+            term = try RawTerminal(true).init();
 
             try term.stdout.lock(.none);
             defer term.stdout.unlock();

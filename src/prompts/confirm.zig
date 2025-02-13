@@ -46,8 +46,8 @@ pub fn ConfirmPrompt(comptime options: struct {
         var term: RawTerminal(true) = undefined;
         var current: if (options.toggle) bool else void = if (options.toggle) false else {};
 
-        pub fn run(allocator: std.mem.Allocator) !bool {
-            term = try RawTerminal(true).init(allocator);
+        pub fn run() !bool {
+            term = try RawTerminal(true).init();
 
             try term.stdout.lock(.none);
             defer term.stdout.unlock();
