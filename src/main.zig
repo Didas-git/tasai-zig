@@ -92,6 +92,36 @@ pub fn main() !void {
     const answer2 = try s_p.run();
     try writer.print("Answer: {s}\n", .{answer2});
 
+    const s_p4 = SelectPrompt([]const u8, .{
+        .message = "Pick",
+        .multiple = true,
+        .choices = &.{
+            "Almond",
+            "Apple",
+            "Banana",
+            "Blackberry",
+            "Blueberry",
+            "Cherry",
+            "Chocolate",
+            "Cinnamon",
+            "Coconut",
+            "Cranberry",
+            "Grape",
+            "Nougat",
+            "Orange",
+            "Pear",
+            "Pineapple",
+            "Raspberry",
+            "Strawberry",
+            "Vanilla",
+            "Watermelon",
+            "Wintergreen",
+        },
+    });
+
+    const answer11 = try s_p4.run(allocator);
+    try writer.print("Answer: {s}\n", .{answer11});
+
     const StringKV = KV([]const u8);
 
     const s_p2 = SelectPrompt(StringKV, .{
@@ -145,4 +175,12 @@ pub fn main() !void {
 
     const answer8 = try i_p4.run(allocator);
     try writer.print("Answer: {d}\n", .{answer8});
+
+    const i_p5 = InputPrompt([]const u8, .{
+        .message = "Give me a list",
+        .list = true,
+    });
+
+    const answer10 = try i_p5.run(allocator);
+    try writer.print("Answer: {s}\n", .{answer10});
 }
