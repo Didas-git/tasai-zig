@@ -85,12 +85,14 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
                 },
                 254 => {
                     i = options.choices.len - 1;
+                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
                     try clearChoices();
                     try render();
                     return null;
                 },
                 255 => {
                     i = 0;
+                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
                     try clearChoices();
                     try render();
                     return null;
