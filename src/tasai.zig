@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub usingnamespace @import("./ansi.zig");
 
 pub const Color = @import("Color.zig");
@@ -16,3 +18,7 @@ pub const prompt = struct {
     pub const Select = @import("./prompts/select.zig").SelectPrompt;
     pub const Confirm = @import("./prompts/confirm.zig").ConfirmPrompt;
 };
+
+test "imports" {
+    std.testing.refAllDecls(@This());
+}
