@@ -2,9 +2,7 @@ const std = @import("std");
 const CSI = @import("./csi.zig");
 
 pub fn RawTerminal(comptime handle_control_codes: bool) type {
-    const StaticFifo = std.fifo.LinearFifo(u8, .{ .Static = 8 });
     return struct {
-        fifo: StaticFifo,
         tty: std.fs.File,
         termios: std.posix.termios,
         stdout: std.fs.File = std.io.getStdOut(),
@@ -43,7 +41,6 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
             try std.posix.tcsetattr(file.handle, .NOW, termios);
 
             return .{
-                .fifo = StaticFifo.init(),
                 .tty = file,
                 .termios = original_termios,
             };
@@ -52,7 +49,6 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
         pub fn deinit(self: RawTerminal(handle_control_codes)) !void {
             try self.stdout.writeAll(CSI.CUS);
             try std.posix.tcsetattr(self.tty.handle, .NOW, self.termios);
-            self.fifo.deinit();
         }
 
         /// The handler has 4 bytes as special cases:
@@ -63,9 +59,8 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
         pub fn readInput(self: *RawTerminal(handle_control_codes), comptime T: type, handler: fn (byte: u8) anyerror!?T) !T {
             var buf: [8]u8 = undefined;
             while (true) {
-                const isReady = try self.poll();
+                const isReady, const bytes = try self.poll(&buf);
                 if (!isReady) return error.FailedToPoll;
-                const bytes = self.fifo.read(&buf);
 
                 if (bytes > 1) {
                     if (buf[0] == std.ascii.control_code.esc) {
@@ -113,8 +108,8 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
         }
 
         // This is an adaptation of the std implementation (https://github.com/ziglang/zig/blob/5b9b5e45cb710ddaad1a97813d1619755eb35a98/lib/std/io.zig#L610)
-        // to work with a static fifo instead
-        fn poll(self: *RawTerminal(handle_control_codes)) !bool {
+        // to work without a fifo
+        fn poll(self: *RawTerminal(handle_control_codes), buf: []u8) !struct { bool, usize } {
             const err_mask = std.posix.POLL.ERR | std.posix.POLL.NVAL | std.posix.POLL.HUP;
 
             var temp = [_]std.posix.pollfd{.{
@@ -128,17 +123,16 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
             var poll_fd = temp[0];
 
             if (events_len == 0) {
-                return poll_fd.fd != -1;
+                return .{ poll_fd.fd != -1, 0 };
             }
 
+            var amt: usize = 0;
             var keep_polling = false;
             if (poll_fd.revents & std.posix.POLL.IN != 0) {
-                const buf = try self.fifo.writableWithSize(8);
-                const amt = std.posix.read(poll_fd.fd, buf) catch |err| switch (err) {
+                amt = std.posix.read(poll_fd.fd, buf) catch |err| switch (err) {
                     error.BrokenPipe => 0,
                     else => |e| return e,
                 };
-                self.fifo.update(amt);
                 if (amt == 0) {
                     poll_fd.fd = -1;
                 } else {
@@ -150,7 +144,7 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
                 keep_polling = true;
             }
 
-            return keep_polling;
+            return .{ keep_polling, amt };
         }
     };
 }
