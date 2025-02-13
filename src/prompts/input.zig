@@ -9,6 +9,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
     header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
     accept_empty: bool = false,
+    hide_cursor: bool = false,
     invisible: bool = false,
     password: bool = false,
     password_placeholder: u8 = '*',
@@ -58,7 +59,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
             const writer = term.stdout.writer();
 
-            try writer.writeAll(CSI.CUH ++ ask);
+            try writer.writeAll((if (comptime options.hide_cursor) CSI.CUH else "") ++ ask);
 
             const answer = try term.readInput([]const u8, handler);
             try term.deinit();
