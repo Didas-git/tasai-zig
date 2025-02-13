@@ -1,14 +1,17 @@
 const std = @import("std");
 const CSI = @import("./csi.zig");
 
-pub fn RawTerminal(comptime handle_control_codes: bool) type {
+/// Currently only handles `Ctrl+C`
+pub fn RawTerminal(comptime handle_exit_codes: bool) type {
     return struct {
         tty: std.fs.File,
         termios: std.posix.termios,
         stdout: std.fs.File = std.io.getStdOut(),
         stdin: std.fs.File = std.io.getStdIn(),
 
-        pub fn init() !RawTerminal(handle_control_codes) {
+        const Self = @This();
+
+        pub fn init() !Self {
             const file = try std.fs.openFileAbsolute("/dev/tty", .{
                 .mode = .read_write,
                 .allow_ctty = true,
@@ -46,7 +49,7 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
             };
         }
 
-        pub fn deinit(self: RawTerminal(handle_control_codes)) !void {
+        pub fn deinit(self: Self) !void {
             try self.stdout.writeAll(CSI.CUS);
             try std.posix.tcsetattr(self.tty.handle, .NOW, self.termios);
         }
@@ -56,7 +59,7 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
         /// 253 - Arrow Down (ESC B | ESC[B | ESC O B)
         /// 254 - Arrow Right (ESC C | ESC[C | ESC O C)
         /// 255 - Arrow Left (ESC D | ESC[D | ESC O D)
-        pub fn readInput(self: *RawTerminal(handle_control_codes), comptime T: type, handler: fn (byte: u8) anyerror!?T) !T {
+        pub fn readInput(self: *Self, comptime T: type, handler: fn (byte: u8) anyerror!?T) !T {
             var buf: [8]u8 = undefined;
             while (true) {
                 const isReady, const bytes = try self.poll(&buf);
@@ -85,7 +88,7 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
                     } else {
                         return error.UnsupportedValue;
                     }
-                } else if (handle_control_codes) {
+                } else if (comptime handle_exit_codes) {
                     switch (buf[0]) {
                         std.ascii.control_code.etx => {
                             try self.deinit();
@@ -109,7 +112,7 @@ pub fn RawTerminal(comptime handle_control_codes: bool) type {
 
         // This is an adaptation of the std implementation (https://github.com/ziglang/zig/blob/5b9b5e45cb710ddaad1a97813d1619755eb35a98/lib/std/io.zig#L610)
         // to work without a fifo
-        fn poll(self: *RawTerminal(handle_control_codes), buf: []u8) !struct { bool, usize } {
+        fn poll(self: *Self, buf: []u8) !struct { bool, usize } {
             const err_mask = std.posix.POLL.ERR | std.posix.POLL.NVAL | std.posix.POLL.HUP;
 
             var temp = [_]std.posix.pollfd{.{
