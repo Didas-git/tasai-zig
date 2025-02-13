@@ -2,6 +2,8 @@ const std = @import("std");
 const CSI = @import("../csi.zig");
 const RawTerminal = @import("../terminal.zig").RawTerminal;
 
+const assert = std.debug.assert;
+
 pub fn InputPrompt(comptime T: type, comptime options: struct {
     message: []const u8,
     header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
@@ -10,19 +12,25 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
     invisible: bool = false,
     password: bool = false,
     password_placeholder: u8 = '*',
+    list: bool = false,
+    list_separator: u8 = ',',
 }) type {
-    std.debug.assert(options.message.len > 0);
-    std.debug.assert(T == []const u8 or switch (@typeInfo(T)) {
+    assert(options.message.len > 0);
+    assert(T == []const u8 or switch (@typeInfo(T)) {
         .Int, .Float => true,
         else => false,
     });
 
     if (options.invisible) {
-        std.debug.assert(!options.password);
+        assert(!options.password);
     }
 
     if (options.password) {
-        std.debug.assert(T == []const u8);
+        assert(T == []const u8);
+    }
+
+    if (options.list) {
+        assert(!options.password and !options.invisible and T == []const u8);
     }
 
     const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.comptimeGet(.Dim) else ""), .{
@@ -40,7 +48,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         var term: RawTerminal(true) = undefined;
         var arr: std.ArrayList(u8) = undefined;
 
-        pub fn run(allocator: std.mem.Allocator) !T {
+        pub fn run(allocator: std.mem.Allocator) !if (options.list) []T else T {
             term = try RawTerminal(true).init();
             arr = std.ArrayList(u8).init(allocator);
             defer arr.deinit();
@@ -60,7 +68,31 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 for (answer) |_| {
                     try arr.append(options.password_placeholder);
                 }
+
                 try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try arr.toOwnedSlice() });
+            } else if (comptime options.list) {
+                var final = std.ArrayList([]const u8).init(allocator);
+                defer final.deinit();
+
+                var iterator = std.mem.split(u8, answer, &.{options.list_separator});
+                while (iterator.next()) |part| {
+                    try final.append(std.mem.trim(u8, part, " "));
+                }
+
+                for (answer) |char| {
+                    if (char == options.list_separator) {
+                        try arr.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+                        try arr.append(char);
+                        try arr.appendSlice(CSI.SGR.comptimeGet(.Foreground_Cyan));
+                    } else {
+                        try arr.append(char);
+                    }
+                }
+
+                try arr.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+
+                try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try arr.toOwnedSlice() });
+                return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
                     .Int => try std.fmt.parseInt(T, answer, 10),
@@ -75,12 +107,10 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 }
 
                 return num;
+            } else if (comptime options.invisible) {
+                try writer.writeAll(done ++ "\n");
             } else {
-                if (comptime options.invisible) {
-                    try writer.writeAll(done ++ "\n");
-                } else {
-                    try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ done, answer });
-                }
+                try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ done, answer });
             }
 
             return answer;
