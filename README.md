@@ -30,9 +30,9 @@ exe.root_module.addImport("tasai", tasai.module("tasai"));
 ### Confirm Prompt
 
 ```zig
-const prompts = @import("tasai").prompts;
+const prompt = @import("tasai").prompt;
 
-const prompt = prompts.ConfirmPrompt(.{ .message = "Are you alive?" });
+const prompt = prompt.Confirm(.{ .message = "Are you alive?" });
 
 const std_out = std.io.getStdOut();
 const answer = try prompt.run();
@@ -46,9 +46,9 @@ try writer.print("Answer: {any}\n", .{answer});
 #### Using Strings
 
 ```zig
-const prompts = @import("tasai").prompts;
+const prompt = @import("tasai").prompt;
 
-const prompt = prompts.SelectPrompt([]const u8, .{ 
+const prompt = prompt.Select([]const u8, .{ 
     .message = "Pick one", 
     .choices = &.{
         "Apples",
@@ -70,11 +70,11 @@ Using key value pairs allows you to display a message and get a completely diffe
 
 ```zig
 const tasai = @import("tasai");
-const prompts = tasai.prompts;
+const prompt = tasai.prompt;
 
 const StringKV = tasai.KV([]const u8);
 
-const prompt = prompts.SelectPrompt(StringKV, .{ 
+const prompt = prompt.Select(StringKV, .{ 
     .message = "Pick one", 
     .choices = &.{
         .{ .name = "Apple", .value = "I Love Apples" },
@@ -90,17 +90,43 @@ const writer = std_out.writer();
 try writer.print("Answer: {s}\n", .{answer});
 ```
 
+#### Accepting multiple choices
+
+To accept multiple options all you need to do is pass in `.multiple = true` to the options and pass an `Allocator` to the `run` function.
+
+```zig
+const prompt = @import("tasai").prompt;
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
+const prompt = prompts.Select([]const u8, .{ 
+    .message = "Pick one",
+    .multiple = true,
+    .choices = &.{
+        "Apples",
+        "Oranges",
+        "Grapes",
+    }, 
+});
+
+const std_out = std.io.getStdOut();
+const answer = try prompt.run(allocator);
+const writer = std_out.writer();
+
+try writer.print("Answer: {s}\n", .{answer});
+```
+
 ### Input Prompt
 
 Input prompts are very versatile and work with both strings and numbers (ints and floats).
 They can be made "invisible" (doesn't show what the user is currently typing) and also work as password input by setting the respective options.
 
 ```zig
-const prompts = @import("tasai").prompts;
+const prompt = @import("tasai").prompt;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
-const prompt = prompts.Input([]const u8, .{ .message = "Who are you?" });
+const prompt = prompt.Input([]const u8, .{ .message = "Who are you?" });
 
 const std_out = std.io.getStdOut();
 const answer = try prompt.run(allocator);

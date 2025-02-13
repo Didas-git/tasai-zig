@@ -10,3 +10,9 @@ pub fn KV(comptime T: type) type {
         value: T,
     };
 }
+
+pub const prompt = struct {
+    pub const Input = @import("./prompts/input.zig").InputPrompt;
+    pub const Select = @import("./prompts/select.zig").SelectPrompt;
+    pub const Confirm = @import("./prompts/confirm.zig").ConfirmPrompt;
+};
