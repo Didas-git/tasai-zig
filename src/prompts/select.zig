@@ -26,6 +26,7 @@ pub fn SelectPrompt(
         footer: [2][]const u8 = .{ "...", "\u{00b7}" },
         arrow: []const u8 = "\u{25b8}",
         multiple: bool = false,
+        allow_empty: bool = false,
         multiple_marker: []const u8 = "\u{1f5f8}",
     },
 ) type {
@@ -108,7 +109,13 @@ pub fn SelectPrompt(
             const self: *Self = @ptrCast(@alignCast(ctx));
 
             return switch (byte) {
-                std.ascii.control_code.lf, std.ascii.control_code.cr => true,
+                std.ascii.control_code.lf, std.ascii.control_code.cr => {
+                    if (comptime !options.allow_empty) {
+                        if (self.selected_choices.count() <= 0) return null;
+                    }
+
+                    return true;
+                },
                 ' ' => {
                     if (!self.selected_choices.remove(i)) {
                         try self.selected_choices.put(i, {});
