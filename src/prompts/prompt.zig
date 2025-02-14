@@ -1,9 +1,3 @@
-// TODO: Make a generic prompt interface
-// It should take in a table of functions
-// Table:
-// initial() - handle initial rendering of the prompt
-// update(u8) - handler to be passed into `readInput`
-// format() - handle final rendering before returning
 const std = @import("std");
 const Terminal = @import("../terminal.zig").Terminal;
 
