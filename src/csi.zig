@@ -63,7 +63,7 @@ pub const ED3 = FeEscapeSequence.CSI ++ "3J";
 pub const EL0 = FeEscapeSequence.CSI ++ "0K";
 /// Clear from cursor to beginning of line
 pub const EL1 = FeEscapeSequence.CSI ++ "1K";
-/// Clear entire line (doesn't change) cursor position
+/// Clear entire line (doesn't change cursor position)
 pub const EL2 = FeEscapeSequence.CSI ++ "2K";
 
 pub const AUXON = FeEscapeSequence.CSI ++ "5i";
