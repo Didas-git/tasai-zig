@@ -176,6 +176,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
+                // TODO: Validate if the answer fits
+                // into the given integer/float size
                 const num = switch (comptime @typeInfo(T)) {
                     .Int => try std.fmt.parseInt(T, answer, 10),
                     .Float => try std.fmt.parseFloat(T, answer),
