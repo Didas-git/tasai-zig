@@ -7,96 +7,103 @@ const mem = std.mem;
 /// Not all SGR Attributes are supported by all terminals,
 /// it's up for the developer to know which ones work and which don't.
 pub const Attribute = enum(u8) {
-    Reset,
-    Bold,
-    Dim,
-    Italic,
-    Underline,
-    Slow_Blink,
-    Rapid_Blink,
+    reset,
+    bold,
+    dim,
+    italic,
+    underline,
+    slow_blink,
+    rapid_blink,
     // Invert foreground and background colors
-    Invert,
-    Hide,
-    Strike_Through,
-    Default_Font,
-    Font_1,
-    Font_2,
-    Font_3,
-    Font_4,
-    Font_5,
-    Font_6,
-    Font_7,
-    Font_8,
-    Font_9,
-    Font_Gothic,
+    invert,
+    hide,
+    strike_through,
+    default_font,
+    font_1,
+    font_2,
+    font_3,
+    font_4,
+    font_5,
+    font_6,
+    font_7,
+    font_8,
+    font_9,
+    font_gothic,
     /// In some terminals this acts as code 22 (not bold).
-    Double_Underline,
-    Not_Bold_Or_Dim,
-    Not_Italic,
-    Not_Underlined,
-    Not_Blinking,
-    Proportional_Spacing,
-    Not_Inverted,
-    Reveal,
-    Not_Crossed_Out,
-    Foreground_Black,
-    Foreground_Red,
-    Foreground_Green,
-    Foreground_Yellow,
-    Foreground_Blue,
-    Foreground_Magenta,
-    Foreground_Cyan,
-    Foreground_White,
+    double_underline,
+    not_bold_or_dim,
+    not_italic,
+    not_underlined,
+    Not_blinking,
+    proportional_spacing,
+    not_inverted,
+    reveal,
+    not_crossed_out,
+    foreground_black,
+    foreground_red,
+    foreground_green,
+    foreground_yellow,
+    foreground_blue,
+    foreground_magenta,
+    foreground_cyan,
+    foreground_white,
     /// Used for 8bit and 24bit (true color).
-    Set_Foreground_Color,
-    Default_Foreground_Color,
-    Background_Black,
-    Background_Red,
-    Background_Green,
-    Background_Yellow,
-    Background_Blue,
-    Background_Magenta,
-    Background_Cyan,
-    Background_White,
+    set_foreground_color,
+    default_foreground_color,
+    background_black,
+    background_red,
+    background_green,
+    background_yellow,
+    background_blue,
+    background_magenta,
+    background_cyan,
+    background_white,
     /// Used for 8bit and 24bit (true color).
-    Set_Background_Color,
-    Default_Background_Color,
-    Disable_Proportional_Spacing,
-    Framed,
-    Encircled,
-    Overlined,
-    Not_Framed_Or_Encircled,
-    Not_Overlined,
+    set_background_color,
+    default_background_color,
+    disable_proportional_spacing,
+    framed,
+    encircled,
+    overlined,
+    not_framed_or_encircled,
+    not_overlined,
     /// Follows the same convention as codes 38 and 48.
     /// Only supports 8bit and 24bit colors.
-    Set_Underline_Color = 58,
-    Default_Underline_Color,
-    Ideogram_Underline_Or_Right_Side_Line,
-    Ideogram_Double_Underline_Or_Double_Line_On_Right_Side,
-    Ideogram_Overline_Or_Left_Side_Line,
-    Ideogram_Double_Overline_Or_Double_Line_On_Left_Side,
-    Ideogram_Stress_Marking,
+    set_underline_color = 58,
+    default_underline_color,
+    ideogram_underline_or_right_side_line,
+    ideogram_double_underline_or_double_line_on_right_side,
+    ideogram_overline_or_left_side_line,
+    ideogram_double_overline_or_double_line_on_left_side,
+    ideogram_stress_marking,
     /// Disables all codes 60 to 64
-    No_Ideogram_Attributes,
-    Superscript = 73,
-    Subscript,
-    Not_Superscript_Or_Subscript,
-    Foreground_Bright_Black = 90,
-    Foreground_Bright_Red,
-    Foreground_Bright_Green,
-    Foreground_Bright_Yellow,
-    Foreground_Bright_Blue,
-    Foreground_Bright_Magenta,
-    Foreground_Bright_Cyan,
-    Foreground_Bright_White,
-    Background_Bright_Black = 100,
-    Background_Bright_Red,
-    Background_Bright_Green,
-    Background_Bright_Yellow,
-    Background_Bright_Blue,
-    Background_Bright_Magenta,
-    Background_Bright_Cyan,
-    Background_Bright_White,
+    no_ideogram_attributes,
+    superscript = 73,
+    subscript,
+    not_superscript_or_subscript,
+    foreground_bright_black = 90,
+    foreground_bright_red,
+    foreground_bright_green,
+    foreground_bright_yellow,
+    foreground_bright_blue,
+    foreground_bright_magenta,
+    foreground_bright_cyan,
+    foreground_bright_white,
+    background_bright_black = 100,
+    background_bright_red,
+    background_bright_green,
+    background_bright_yellow,
+    background_bright_blue,
+    background_bright_magenta,
+    background_bright_cyan,
+    background_bright_white,
+
+    // TODO: Support currently invalid attributes
+    // Invalid attributes wont work, they are the following:
+    // set_foreground_color, set_background_color, set_underline_color
+    pub fn str(comptime self: Attribute) []const u8 {
+        return std.fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(self)});
+    }
 };
 
 pub const Modifier = union(enum) {
@@ -128,31 +135,6 @@ pub const Modifier = union(enum) {
     } },
     attribute: Attribute,
 };
-
-/// Due to the simplicity of this function the
-/// 8bit and 24bit color attributes are invalid
-pub fn get(buf: []u8, attribute: Attribute) ![]const u8 {
-    const is_invalid = switch (attribute) {
-        .Set_Foreground_Color, .Set_Background_Color, .Set_Underline_Color => true,
-        else => false,
-    };
-
-    if (is_invalid) return error.InvalidAttribute;
-    return std.fmt.bufPrint(buf, FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)}) catch unreachable;
-}
-
-/// Due to the simplicity of this function the
-/// 8bit and 24bit color attributes are invalid
-pub inline fn comptimeGet(comptime attribute: Attribute) []const u8 {
-    const is_invalid = switch (attribute) {
-        .Set_Foreground_Color, .Set_Background_Color, .Set_Underline_Color => true,
-        else => false,
-    };
-
-    if (is_invalid) @compileError("Invalid Attribute.");
-
-    return std.fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)});
-}
 
 pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifiers: []const Modifier, comptime closing_modifiers: []const Modifier) []const u8 {
     comptime {
@@ -206,28 +188,28 @@ const SGRCode = struct {
 /// as it is intended to be an internal map
 fn CreateAvailableColors(comptime additive: u8) type {
     const close: u8 = switch (additive) {
-        0 => @intFromEnum(Attribute.Default_Foreground_Color),
-        10 => @intFromEnum(Attribute.Default_Background_Color),
+        0 => @intFromEnum(Attribute.default_foreground_color),
+        10 => @intFromEnum(Attribute.default_background_color),
         else => @compileError("Only 0 and 10 are supported additives."),
     };
 
     return struct {
-        const black: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Black) + additive, .close = close };
-        const red: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Red) + additive, .close = close };
-        const green: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Green) + additive, .close = close };
-        const yellow: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Yellow) + additive, .close = close };
-        const blue: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Blue) + additive, .close = close };
-        const magenta: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Magenta) + additive, .close = close };
-        const cyan: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Cyan) + additive, .close = close };
-        const white: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_White) + additive, .close = close };
-        const bBlack: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Black) + additive, .close = close };
-        const bRed: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Red) + additive, .close = close };
-        const bGreen: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Green) + additive, .close = close };
-        const bYellow: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Yellow) + additive, .close = close };
-        const bBlue: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Blue) + additive, .close = close };
-        const bMagenta: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Magenta) + additive, .close = close };
-        const bCyan: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_Cyan) + additive, .close = close };
-        const bWhite: SGRCode = .{ .open = @intFromEnum(Attribute.Foreground_Bright_White) + additive, .close = close };
+        const black: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_black) + additive, .close = close };
+        const red: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_red) + additive, .close = close };
+        const green: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_green) + additive, .close = close };
+        const yellow: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_yellow) + additive, .close = close };
+        const blue: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_blue) + additive, .close = close };
+        const magenta: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_magenta) + additive, .close = close };
+        const cyan: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_cyan) + additive, .close = close };
+        const white: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_white) + additive, .close = close };
+        const bBlack: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_black) + additive, .close = close };
+        const bRed: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_red) + additive, .close = close };
+        const bGreen: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_green) + additive, .close = close };
+        const bYellow: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_yellow) + additive, .close = close };
+        const bBlue: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_blue) + additive, .close = close };
+        const bMagenta: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_magenta) + additive, .close = close };
+        const bCyan: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_cyan) + additive, .close = close };
+        const bWhite: SGRCode = .{ .open = @intFromEnum(Attribute.foreground_bright_white) + additive, .close = close };
         const gray = bBlack;
         const grey = bBlack;
     };
@@ -305,47 +287,47 @@ pub inline fn parseString(comptime text: []const u8) []const u8 {
                         stack = stack[0 .. stack.len - 1];
                     },
                     'b' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Bold_Or_Dim});
-                        appendAttribute(&final_text, .Bold, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_bold_or_dim});
+                        appendAttribute(&final_text, .bold, previous_is_token);
                     },
                     'd' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Bold_Or_Dim});
-                        appendAttribute(&final_text, .Dim, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_bold_or_dim});
+                        appendAttribute(&final_text, .dim, previous_is_token);
                     },
                     'i' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Italic});
-                        appendAttribute(&final_text, .Italic, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_italic});
+                        appendAttribute(&final_text, .italic, previous_is_token);
                     },
                     'u' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Underlined});
-                        appendAttribute(&final_text, .Underline, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_underlined});
+                        appendAttribute(&final_text, .underline, previous_is_token);
                     },
                     's' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Crossed_Out});
-                        appendAttribute(&final_text, .Strike_Through, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_crossed_out});
+                        appendAttribute(&final_text, .strike_through, previous_is_token);
                     },
                     'o' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Overlined});
-                        appendAttribute(&final_text, .Overlined, previous_is_token);
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_overlined});
+                        appendAttribute(&final_text, .overlined, previous_is_token);
                     },
                     else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
                 },
                 else => {
                     if (mem.eql(u8, token, "du")) {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Underlined});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_underlined});
                         final_text = if (previous_is_token)
-                            final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(Attribute.Double_Underline)})
+                            final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(Attribute.double_underline)})
                         else
-                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(Attribute.Double_Underline)});
+                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(Attribute.double_underline)});
                     } else if (mem.eql(u8, token, "inv")) {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.Not_Inverted});
+                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_inverted});
                         appendAttribute(&final_text, .Invert, previous_is_token);
                     } else if (token[0] == 'f') {
-                        parseColorAttribute(&final_text, &stack, token, .Set_Foreground_Color, .Default_Foreground_Color, previous_is_token);
+                        parseColorAttribute(&final_text, &stack, token, .set_foreground_color, .default_foreground_color, previous_is_token);
                     } else if (token[0] == 'b') {
-                        parseColorAttribute(&final_text, &stack, token, .Set_Background_Color, .Default_Background_Color, previous_is_token);
+                        parseColorAttribute(&final_text, &stack, token, .set_background_color, .default_background_color, previous_is_token);
                     } else if (token[0] == 'u') {
-                        parseColorAttribute(&final_text, &stack, token, .Set_Underline_Color, .Default_Underline_Color, previous_is_token);
+                        parseColorAttribute(&final_text, &stack, token, .set_underline_color, .default_underline_color, previous_is_token);
                     } else {
                         @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token}));
                     }
@@ -397,9 +379,9 @@ fn parseColorAttribute(
             // Handle 4bit
         } else {
             const color = switch (opening_attribute) {
-                .Set_Foreground_Color => @field(ForegroundColors, color_part),
-                .Set_Background_Color => @field(BackgroundColors, color_part),
-                .Set_Underline_Color => @compileError("Underline doesn't support 4bit colors."),
+                .set_foreground_color => @field(ForegroundColors, color_part),
+                .set_background_color => @field(BackgroundColors, color_part),
+                .set_underline_color => @compileError("Underline doesn't support 4bit colors."),
                 else => @compileError("Invalid Attribute"),
             };
 

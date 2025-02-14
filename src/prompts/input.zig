@@ -50,7 +50,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
     const ReturnType = if (comptime options.list) []T else T;
 
-    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.comptimeGet(.Dim) else ""), .{
+    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.Attribute.dim.str() else ""), .{
         options.header[0],
         options.message,
         options.footer[0],
@@ -213,7 +213,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                     try self.array.append(options.password_placeholder);
                 }
 
-                try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try self.array.toOwnedSlice() });
+                try writer.print(CSI.SGR.parseString(CSI.SGR.Attribute.not_bold_or_dim.str() ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try self.array.toOwnedSlice() });
             } else if (comptime options.list) {
                 var final = std.ArrayList([]const u8).init(self.allocator);
                 defer final.deinit();
@@ -227,17 +227,17 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
                 for (answer) |char| {
                     if (char == options.list_separator) {
-                        try self.array.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+                        try self.array.appendSlice(CSI.SGR.Attribute.default_foreground_color.str());
                         try self.array.append(char);
-                        try self.array.appendSlice(CSI.SGR.comptimeGet(.Foreground_Cyan));
+                        try self.array.appendSlice(CSI.SGR.Attribute.foreground_cyan.str());
                     } else {
                         try self.array.append(char);
                     }
                 }
 
-                try self.array.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+                try self.array.appendSlice(CSI.SGR.Attribute.default_foreground_color.str());
 
-                try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
+                try writer.print("{s}" ++ CSI.SGR.Attribute.foreground_cyan.str() ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
