@@ -189,7 +189,7 @@ pub fn SelectPrompt(
             _ = term;
 
             const to_clear = if (comptime options.choices.len < options.limit) options.choices.len + 1 else options.limit;
-            try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
+            try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.ED0);
 
             if (comptime options.multiple) {
                 var array_to_print = std.ArrayList([]const u8).init(self.allocator);
@@ -227,7 +227,7 @@ pub fn SelectPrompt(
 
         fn clearChoices(term: *Terminal) !void {
             const to_clear = if (comptime options.choices.len < options.limit) options.choices.len else options.limit - 1;
-            try term.stdout.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
+            try term.stdout.writeAll(CSI.C_CPL(to_clear) ++ CSI.ED0);
         }
 
         fn renderChoices(term: *Terminal) !void {

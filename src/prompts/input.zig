@@ -89,7 +89,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
             if (byte == std.ascii.control_code.del or byte == 177) {
                 if (self.array.popOrNull()) |_| {
-                    try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.C_EL(0));
+                    try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.EL0);
                 }
 
                 return null;
@@ -142,7 +142,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
             const self: *Self = @ptrCast(@alignCast(ctx));
 
-            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
+            try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
 
             if (comptime options.password) {
                 for (answer) |_| {

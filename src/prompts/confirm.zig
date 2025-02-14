@@ -78,14 +78,14 @@ pub fn ConfirmPrompt(comptime options: struct {
                     std.ascii.control_code.lf, std.ascii.control_code.cr => current,
                     254 => {
                         if (!current) {
-                            try term.stdout.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(0) ++ toggle_asking ++ toggle_yes);
+                            try term.stdout.writeAll(CSI.C_CHA(0) ++ CSI.EL0 ++ toggle_asking ++ toggle_yes);
                             current = true;
                         }
                         return null;
                     },
                     255 => {
                         if (current) {
-                            try term.stdout.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(0) ++ toggle_asking ++ toggle_no);
+                            try term.stdout.writeAll(CSI.C_CHA(0) ++ CSI.EL0 ++ toggle_asking ++ toggle_no);
                             current = false;
                         }
                         return null;
@@ -107,7 +107,7 @@ pub fn ConfirmPrompt(comptime options: struct {
             _ = ctx;
             _ = term;
 
-            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
+            try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
 
             if (comptime options.toggle) {
                 try writer.print(toggle_done ++ "{s}\n", .{if (current) toggle_yes else toggle_no});

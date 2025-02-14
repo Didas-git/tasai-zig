@@ -20,17 +20,6 @@ pub const CPL = CommandWithAmount('F');
 pub const CHA = CommandWithAmount('G');
 /// Cursor Position
 pub const CUP = CommandWithRPositionalArgs('H');
-
-// TODO: Some of this codes can be "simplified"
-// into more verbose formats that provide a more clear
-// definition of what they are doing
-// It would also remove the function call and
-// allow them to be merged at comptime using "++"
-
-/// Erase in Display
-pub const ED = CommandWithAmount('J');
-/// Erase in Line
-pub const EL = CommandWithAmount('K');
 /// Scroll Up
 pub const SU = CommandWithAmount('S');
 /// Scroll Down
@@ -54,16 +43,28 @@ pub const C_CPL = CommandWithAmountComptime('F');
 pub const C_CHA = CommandWithAmountComptime('G');
 /// Cursor Position
 pub const C_CUP = CommandWithRPositionalArgsComptime('H');
-/// Erase in Display
-pub const C_ED = CommandWithAmountComptime('J');
-/// Erase in Line
-pub const C_EL = CommandWithAmountComptime('K');
 /// Scroll Up
 pub const C_SU = CommandWithAmountComptime('S');
 /// Scroll Down
 pub const C_SD = CommandWithAmountComptime('T');
 /// Horizontal Vertical Position
 pub const C_HVP = CommandWithRPositionalArgsComptime('f');
+
+/// Clear from cursor to end of screen
+pub const ED0 = FeEscapeSequence.CSI ++ "0J";
+/// Clear from cursor to beginning of screen
+pub const ED1 = FeEscapeSequence.CSI ++ "1J";
+/// Clear entire screen
+pub const ED2 = FeEscapeSequence.CSI ++ "2J";
+/// Clear entire screen and delete lines in scroll buffer
+pub const ED3 = FeEscapeSequence.CSI ++ "3J";
+
+/// Clear from cursor to end of line
+pub const EL0 = FeEscapeSequence.CSI ++ "0K";
+/// Clear from cursor to beginning of line
+pub const EL1 = FeEscapeSequence.CSI ++ "1K";
+/// Clear entire line (doesn't change) cursor position
+pub const EL2 = FeEscapeSequence.CSI ++ "2K";
 
 pub const AUXON = FeEscapeSequence.CSI ++ "5i";
 pub const AUXOFF = FeEscapeSequence.CSI ++ "4i";
