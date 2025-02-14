@@ -131,8 +131,12 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             const self: *Self = @ptrCast(@alignCast(ctx));
             const writer = term.stdout.writer();
 
+            // Possible change:
+            // Always reset the terminal with special case for passwords instead
+            // however this requires some reworking of this function that im not willing to do rn
             if (comptime T != []const u8) {
                 if (did_error) {
+                    did_error = false;
                     try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
                     try writer.print(ask ++ "{s}", .{self.array.items});
                 }
