@@ -1,5 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
+const Prompt = @import("./prompt.zig").Prompt(bool, void);
 const Terminal = @import("../terminal.zig").Terminal;
 
 pub fn ConfirmPrompt(comptime options: struct {
@@ -9,7 +10,7 @@ pub fn ConfirmPrompt(comptime options: struct {
     toggle_names: [2][]const u8 = .{ "No", "Yes" },
     header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
-}) type {
+}) Prompt {
     std.debug.assert(options.message.len > 0);
 
     const visual_options = if (options.default_value) "(Y/n)" else "(y/N)";
@@ -42,40 +43,36 @@ pub fn ConfirmPrompt(comptime options: struct {
     const toggle_no = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><u>{s}<r><r> / {s}"), .{ options.toggle_names[0], options.toggle_names[1] });
     const toggle_yes = std.fmt.comptimePrint(CSI.SGR.parseString("{s} / <f:cyan><u>{s}<r><r>"), .{ options.toggle_names[0], options.toggle_names[1] });
 
-    return struct {
-        var term: Terminal = undefined;
+    const gen = struct {
+        const Self = @This();
+
         var current: if (options.toggle) bool else void = if (options.toggle) false else {};
 
-        pub fn run() !bool {
-            term = try Terminal.init();
-            try term.enableRawMode();
+        pub fn prompt(comptime self: Self) Prompt {
+            return .{
+                .ptr = @ptrCast(@constCast(&self)),
+                .vtable = &.{
+                    .initialize = initialize,
+                    .dispatch = dispatch,
+                    .format = format,
+                },
+            };
+        }
 
-            try term.stdout.lock(.none);
-            defer term.stdout.unlock();
-
-            const writer = term.stdout.writer();
+        fn initialize(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) !void {
+            _ = ctx;
+            _ = term;
 
             if (comptime options.toggle) {
                 try writer.writeAll(CSI.CUH ++ toggle_asking ++ toggle_no);
             } else {
                 try writer.writeAll(CSI.CUH ++ ask);
             }
-
-            const answer = try term.readInput(bool, handler);
-            try term.deinit();
-
-            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
-
-            if (comptime options.toggle) {
-                try writer.print(toggle_done ++ "{s}\n", .{if (current) toggle_yes else toggle_no});
-            } else {
-                try writer.print(CSI.SGR.parseString("{s}<f:green>{any}<r>\n"), .{ done, answer });
-            }
-
-            return answer;
         }
 
-        fn handler(byte: u8) !?bool {
+        fn dispatch(ctx: *anyopaque, term: *Terminal, byte: u8) !?bool {
+            _ = ctx;
+
             if (comptime options.toggle) {
                 return switch (byte) {
                     std.ascii.control_code.lf, std.ascii.control_code.cr => current,
@@ -93,24 +90,32 @@ pub fn ConfirmPrompt(comptime options: struct {
                         }
                         return null;
                     },
-                    std.ascii.control_code.etx => {
-                        try term.deinit();
-                        std.process.abort();
-                    },
                     else => null,
                 };
             } else {
                 return switch (byte) {
                     std.ascii.control_code.lf, std.ascii.control_code.cr => options.default_value,
-                    std.ascii.control_code.etx => {
-                        try term.deinit();
-                        std.process.abort();
-                    },
+
                     'y', 'Y' => true,
-                    'n', 'N' => true,
+                    'n', 'N' => false,
                     else => null,
                 };
             }
         }
+
+        fn format(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: bool) !void {
+            _ = ctx;
+            _ = term;
+
+            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
+
+            if (comptime options.toggle) {
+                try writer.print(toggle_done ++ "{s}\n", .{if (current) toggle_yes else toggle_no});
+            } else {
+                try writer.print(CSI.SGR.parseString("{s}<f:green>{any}<r>\n"), .{ done, answer });
+            }
+        }
     };
+
+    return gen.prompt(.{});
 }

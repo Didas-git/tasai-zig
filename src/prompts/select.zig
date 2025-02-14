@@ -1,5 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
+const Prompt = @import("./prompt.zig").Prompt;
 const Terminal = @import("../terminal.zig").Terminal;
 
 fn isKV(comptime T: type) bool {
@@ -15,16 +16,19 @@ fn isKV(comptime T: type) bool {
     }
 }
 
-pub fn SelectPrompt(comptime T: type, comptime options: struct {
-    message: []const u8,
-    choices: []const T,
-    limit: u8 = 10,
-    header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
-    footer: [2][]const u8 = .{ "...", "\u{00b7}" },
-    arrow: []const u8 = "\u{25b8}",
-    multiple: bool = false,
-    multiple_marker: []const u8 = "\u{1f5f8}",
-}) type {
+pub fn SelectPrompt(
+    comptime T: type,
+    comptime options: struct {
+        message: []const u8,
+        choices: []const T,
+        limit: u8 = 10,
+        header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
+        footer: [2][]const u8 = .{ "...", "\u{00b7}" },
+        arrow: []const u8 = "\u{25b8}",
+        multiple: bool = false,
+        multiple_marker: []const u8 = "\u{1f5f8}",
+    },
+) type {
     std.debug.assert(options.message.len > 0);
     std.debug.assert(options.choices.len > 0);
     std.debug.assert(options.limit > 1);
@@ -42,64 +46,167 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     });
 
     const V = @Vector(2, usize);
-    const _ReturnType = if (isKV(T)) @typeInfo(T).Struct.fields[1].type else T;
-    const ReturnType = if (options.multiple) []_ReturnType else _ReturnType;
+    const _ReturnType = if (comptime isKV(T)) @typeInfo(T).Struct.fields[1].type else T;
+    const ReturnType = if (comptime options.multiple) []_ReturnType else _ReturnType;
 
     return struct {
-        var term: Terminal = undefined;
+        const Self = @This();
+
+        allocator: if (options.multiple) std.mem.Allocator else void,
+        selected_choices: if (options.multiple) std.AutoHashMap(usize, void) else void = if (options.multiple) undefined else {},
+
         var i: usize = 0;
         var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-        var arr: if (options.multiple) std.ArrayList(_ReturnType) else void = if (options.multiple) undefined else {};
-        var selected_choices: if (options.multiple) std.AutoHashMap(usize, void) else void = if (options.multiple) undefined else {};
 
         pub const run = if (options.multiple) runWithAllocator else runWithoutAllocator;
 
         fn runWithoutAllocator() !ReturnType {
-            term = try Terminal.init();
-            try term.enableRawMode();
-
-            try term.stdout.lock(.none);
-            defer term.stdout.unlock();
-
-            const writer = term.stdout.writer();
-
-            try writer.writeAll(CSI.CUH ++ ask ++ CSI.C_CNL(1));
-            try renderChoices();
-
-            const answer = try term.readInput(T, handleNormal);
-            try term.deinit();
-
-            const to_clear = if (comptime options.choices.len < options.limit) options.choices.len + 1 else options.limit;
-            try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
-            if (comptime isKV(T)) {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer.name });
-                return answer.value;
-            } else {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer });
-                return answer;
-            }
+            var self: Self = .{
+                .allocator = {},
+                .selected_choices = {},
+            };
+            var p = prompt(&self);
+            return try p.run();
         }
 
         fn runWithAllocator(allocator: std.mem.Allocator) !ReturnType {
-            term = try Terminal.init();
-            try term.enableRawMode();
-            arr = std.ArrayList(_ReturnType).init(allocator);
-            selected_choices = std.AutoHashMap(usize, void).init(allocator);
+            var hash_map = std.AutoHashMap(usize, void).init(allocator);
+            defer hash_map.deinit();
 
-            try term.stdout.lock(.none);
-            defer term.stdout.unlock();
+            var self: Self = .{
+                .allocator = allocator,
+                .selected_choices = hash_map,
+            };
+            var p = prompt(&self);
+            return try p.run();
+        }
 
-            const writer = term.stdout.writer();
+        fn prompt(self: *Self) Prompt(if (options.multiple) bool else T, ReturnType) {
+            return .{
+                .ptr = self,
+                .vtable = &.{
+                    .initialize = initialize,
+                    .dispatch = if (comptime options.multiple) dispatchMultiple else dispatchSingle,
+                    .format = format,
+                },
+            };
+        }
+
+        fn initialize(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
 
             try writer.writeAll(CSI.CUH ++ ask ++ CSI.C_CNL(1));
-            try renderMultiple();
 
-            const answer = try term.readInput(ReturnType, handleMultiple);
-            try term.deinit();
+            if (comptime options.multiple) {
+                try self.renderMultiple(term);
+            } else {
+                try renderChoices(term);
+            }
+        }
+
+        fn dispatchMultiple(ctx: *anyopaque, term: *Terminal, byte: u8) !?bool {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+
+            return switch (byte) {
+                std.ascii.control_code.lf, std.ascii.control_code.cr => true,
+                ' ' => {
+                    if (!self.selected_choices.remove(i)) {
+                        try self.selected_choices.put(i, {});
+                    }
+                    try clearChoices(term);
+                    try self.renderMultiple(term);
+
+                    return null;
+                },
+                252 => {
+                    try move(-1);
+                    try clearChoices(term);
+                    try self.renderMultiple(term);
+                    return null;
+                },
+                253 => {
+                    try move(1);
+                    try clearChoices(term);
+                    try self.renderMultiple(term);
+                    return null;
+                },
+                254 => {
+                    i = options.choices.len - 1;
+                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
+                    try clearChoices(term);
+                    try self.renderMultiple(term);
+                    return null;
+                },
+                255 => {
+                    i = 0;
+                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
+                    try clearChoices(term);
+                    try self.renderMultiple(term);
+                    return null;
+                },
+                else => null,
+            };
+        }
+
+        fn dispatchSingle(ctx: *anyopaque, term: *Terminal, byte: u8) !?T {
+            _ = ctx;
+
+            return switch (byte) {
+                std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
+                252 => {
+                    try move(-1);
+                    try clearChoices(term);
+                    try renderChoices(term);
+                    return null;
+                },
+                253 => {
+                    try move(1);
+                    try clearChoices(term);
+                    try renderChoices(term);
+                    return null;
+                },
+                254 => {
+                    i = options.choices.len - 1;
+                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
+                    try clearChoices(term);
+                    try renderChoices(term);
+                    return null;
+                },
+                255 => {
+                    i = 0;
+                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
+                    try clearChoices(term);
+                    try renderChoices(term);
+                    return null;
+                },
+                else => null,
+            };
+        }
+
+        fn format(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: if (options.multiple) bool else T) !ReturnType {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+
+            _ = term;
 
             const to_clear = if (comptime options.choices.len < options.limit) options.choices.len + 1 else options.limit;
             try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
-            if (comptime isKV(T)) {
+
+            if (comptime options.multiple) {
+                var array_to_print = std.ArrayList([]const u8).init(self.allocator);
+                var array_to_return = std.ArrayList(_ReturnType).init(self.allocator);
+                defer array_to_print.deinit();
+                defer array_to_return.deinit();
+
+                for (options.choices, 0..) |choice, x| {
+                    if (self.selected_choices.contains(x)) {
+                        try array_to_print.append(if (comptime isKV(T)) choice.name else choice);
+                        try array_to_return.append(if (comptime isKV(T)) choice.value else choice);
+                    }
+                }
+
+                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, try array_to_print.toOwnedSlice() });
+                return try array_to_return.toOwnedSlice();
+            } else if (comptime isKV(T)) {
                 try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer.name });
                 return answer.value;
             } else {
@@ -118,49 +225,12 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             } else if (i + 1 > current_block[1]) current_block = current_block + @as(V, @splat(1));
         }
 
-        fn clearChoices() !void {
+        fn clearChoices(term: *Terminal) !void {
             const to_clear = if (comptime options.choices.len < options.limit) options.choices.len else options.limit - 1;
             try term.stdout.writeAll(CSI.C_CPL(to_clear) ++ CSI.C_ED(0));
         }
 
-        fn handleNormal(byte: u8) !?T {
-            return switch (byte) {
-                std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
-                std.ascii.control_code.etx => {
-                    try term.deinit();
-                    std.process.abort();
-                },
-                252 => {
-                    try move(-1);
-                    try clearChoices();
-                    try renderChoices();
-                    return null;
-                },
-                253 => {
-                    try move(1);
-                    try clearChoices();
-                    try renderChoices();
-                    return null;
-                },
-                254 => {
-                    i = options.choices.len - 1;
-                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices();
-                    try renderChoices();
-                    return null;
-                },
-                255 => {
-                    i = 0;
-                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices();
-                    try renderChoices();
-                    return null;
-                },
-                else => null,
-            };
-        }
-
-        fn renderChoices() !void {
+        fn renderChoices(term: *Terminal) !void {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
             const writer = term.stdout.writer();
 
@@ -180,7 +250,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
             }
         }
 
-        fn renderMultiple() !void {
+        fn renderMultiple(self: *Self, term: *Terminal) !void {
             const green_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green>{s}<r>"), .{options.multiple_marker});
             const dim_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<d>{s}<r>"), .{options.multiple_marker});
             const selected = CSI.SGR.parseString("{s} <f:cyan><u>{s}<r><r>");
@@ -190,7 +260,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
 
             for (options.choices[block_start..block_end], block_start..) |choice, x| {
                 const c = if (comptime isKV(T)) choice.name else choice;
-                const marker = if (selected_choices.contains(x)) green_marker else dim_marker;
+                const marker = if (self.selected_choices.contains(x)) green_marker else dim_marker;
 
                 if (x == i) {
                     try writer.print(selected, .{ marker, c });
@@ -202,50 +272,6 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
                     try writer.writeAll(CSI.C_CNL(1));
                 }
             }
-        }
-
-        fn handleMultiple(byte: u8) !?ReturnType {
-            return switch (byte) {
-                std.ascii.control_code.lf, std.ascii.control_code.cr => try arr.toOwnedSlice(),
-                std.ascii.control_code.etx => {
-                    try term.deinit();
-                    std.process.abort();
-                },
-                ' ' => {
-                    try selected_choices.put(i, {});
-                    try arr.append(if (comptime isKV(T)) options.choices[i].value else options.choices[i]);
-                    try clearChoices();
-                    try renderMultiple();
-                    return null;
-                },
-                252 => {
-                    try move(-1);
-                    try clearChoices();
-                    try renderMultiple();
-                    return null;
-                },
-                253 => {
-                    try move(1);
-                    try clearChoices();
-                    try renderMultiple();
-                    return null;
-                },
-                254 => {
-                    i = options.choices.len - 1;
-                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices();
-                    try renderMultiple();
-                    return null;
-                },
-                255 => {
-                    i = 0;
-                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices();
-                    try renderMultiple();
-                    return null;
-                },
-                else => null,
-            };
         }
     };
 }

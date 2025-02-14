@@ -1,5 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
+const Prompt = @import("./prompt.zig").Prompt;
 const Terminal = @import("../terminal.zig").Terminal;
 
 const assert = std.debug.assert;
@@ -34,6 +35,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         assert(!options.password and !options.invisible and T == []const u8);
     }
 
+    const ReturnType = if (comptime options.list) []T else T;
+
     const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.comptimeGet(.Dim) else ""), .{
         options.header[0],
         options.message,
@@ -46,54 +49,131 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
     });
 
     return struct {
-        var term: Terminal = undefined;
-        var arr: std.ArrayList(u8) = undefined;
+        const Self = @This();
 
-        pub fn run(allocator: std.mem.Allocator) !if (options.list) []T else T {
-            term = try Terminal.init();
-            try term.enableRawMode();
-            arr = std.ArrayList(u8).init(allocator);
+        allocator: std.mem.Allocator,
+        array: std.ArrayList(u8),
+
+        pub fn run(allocator: std.mem.Allocator) !ReturnType {
+            const arr = std.ArrayList(u8).init(allocator);
             defer arr.deinit();
 
-            try term.stdout.lock(.none);
-            defer term.stdout.unlock();
+            var self: Self = .{
+                .allocator = allocator,
+                .array = arr,
+            };
+            var p = prompt(&self);
+            return try p.run();
+        }
 
-            const writer = term.stdout.writer();
+        fn prompt(self: *Self) Prompt([]const u8, ReturnType) {
+            return .{
+                .ptr = self,
+                .vtable = &.{
+                    .initialize = initialize,
+                    .dispatch = dispatch,
+                    .format = format,
+                },
+            };
+        }
+
+        fn initialize(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) !void {
+            _ = ctx;
+            _ = term;
 
             try writer.writeAll((if (comptime options.hide_cursor) CSI.CUH else "") ++ ask);
+        }
 
-            const answer = try term.readInput([]const u8, handler);
-            try term.deinit();
+        fn dispatch(ctx: *anyopaque, term: *Terminal, byte: u8) !?[]const u8 {
+            const self: *Self = @ptrCast(@alignCast(ctx));
 
-            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
-            if (comptime options.password) {
-                for (answer) |_| {
-                    try arr.append(options.password_placeholder);
+            if (byte == std.ascii.control_code.del or byte == 177) {
+                if (self.array.popOrNull()) |_| {
+                    try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.C_EL(0));
                 }
 
-                try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try arr.toOwnedSlice() });
+                return null;
+            }
+
+            if (byte == std.ascii.control_code.lf or byte == std.ascii.control_code.cr) {
+                if (comptime !options.accept_empty) {
+                    if (self.array.items.len <= 0) return null;
+                }
+                return try self.array.toOwnedSlice();
+            }
+
+            if (comptime T != []const u8) {
+                switch (comptime @typeInfo(T)) {
+                    .Int => {
+                        switch (byte) {
+                            '0'...'9' => {
+                                if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
+                                try self.array.append(byte);
+                                return null;
+                            },
+                            else => return null,
+                        }
+                    },
+                    .Float => {
+                        switch (byte) {
+                            '.', '0'...'9' => {
+                                if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
+                                try self.array.append(byte);
+                                return null;
+                            },
+                            else => return null,
+                        }
+                    },
+                    else => unreachable,
+                }
+            } else if (std.ascii.isAlphanumeric(byte) or byte == ' ' or byte == options.list_separator) {
+                if (comptime !options.invisible) {
+                    if (comptime options.password) try term.stdout.writeAll(&.{options.password_placeholder}) else try term.stdout.writeAll(&.{byte});
+                }
+                try self.array.append(byte);
+                return null;
+            }
+
+            return null;
+        }
+
+        fn format(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: []const u8) !ReturnType {
+            _ = term;
+
+            const self: *Self = @ptrCast(@alignCast(ctx));
+
+            try writer.writeAll(CSI.C_CHA(0) ++ CSI.C_EL(2));
+
+            if (comptime options.password) {
+                for (answer) |_| {
+                    try self.array.append(options.password_placeholder);
+                }
+
+                try writer.print(CSI.SGR.parseString(CSI.SGR.comptimeGet(.Not_Bold_Or_Dim) ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try self.array.toOwnedSlice() });
             } else if (comptime options.list) {
-                var final = std.ArrayList([]const u8).init(allocator);
+                var final = std.ArrayList([]const u8).init(self.allocator);
                 defer final.deinit();
 
                 var iterator = std.mem.split(u8, answer, &.{options.list_separator});
                 while (iterator.next()) |part| {
-                    try final.append(std.mem.trim(u8, part, " "));
+                    const real_part = std.mem.trim(u8, part, " ");
+                    if (real_part.len == 0) continue;
+                    try final.append(real_part);
                 }
 
                 for (answer) |char| {
                     if (char == options.list_separator) {
-                        try arr.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
-                        try arr.append(char);
-                        try arr.appendSlice(CSI.SGR.comptimeGet(.Foreground_Cyan));
+                        try self.array.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+                        try self.array.append(char);
+                        try self.array.appendSlice(CSI.SGR.comptimeGet(.Foreground_Cyan));
                     } else {
-                        try arr.append(char);
+                        try self.array.append(char);
                     }
                 }
 
-                try arr.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
+                try self.array.appendSlice(CSI.SGR.comptimeGet(.Default_Foreground_Color));
 
-                try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try arr.toOwnedSlice() });
+                try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
@@ -116,62 +196,6 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             }
 
             return answer;
-        }
-
-        fn handler(byte: u8) !?[]const u8 {
-            if (byte == std.ascii.control_code.etx) {
-                try term.deinit();
-                std.process.abort();
-            }
-
-            if (byte == std.ascii.control_code.del or byte == 177) {
-                if (arr.popOrNull()) |_| {
-                    try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.C_EL(0));
-                }
-
-                return null;
-            }
-
-            if (byte == std.ascii.control_code.lf or byte == std.ascii.control_code.cr) {
-                if (comptime !options.accept_empty) {
-                    if (arr.items.len <= 0) return null;
-                }
-                return try arr.toOwnedSlice();
-            }
-
-            if (comptime T != []const u8) {
-                switch (comptime @typeInfo(T)) {
-                    .Int => {
-                        switch (byte) {
-                            '0'...'9' => {
-                                if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
-                                try arr.append(byte);
-                                return null;
-                            },
-                            else => return null,
-                        }
-                    },
-                    .Float => {
-                        switch (byte) {
-                            '.', '0'...'9' => {
-                                if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
-                                try arr.append(byte);
-                                return null;
-                            },
-                            else => return null,
-                        }
-                    },
-                    else => unreachable,
-                }
-            } else if (std.ascii.isAlphanumeric(byte)) {
-                if (comptime !options.invisible) {
-                    if (comptime options.password) try term.stdout.writeAll(&.{options.password_placeholder}) else try term.stdout.writeAll(&.{byte});
-                }
-                try arr.append(byte);
-                return null;
-            }
-
-            return null;
         }
     };
 }

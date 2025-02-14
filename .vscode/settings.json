@@ -6,7 +6,8 @@
         "tasai",
         "tcgetattr",
         "tcsetattr",
-        "termios"
+        "termios",
+        "vtable"
     ],
     "zig.zls.enableBuildOnSave": true
 }

@@ -135,42 +135,31 @@ pub const Terminal = struct {
     /// 253 - Arrow Down (ESC B | ESC[B | ESC O B)
     /// 254 - Arrow Right (ESC C | ESC[C | ESC O C)
     /// 255 - Arrow Left (ESC D | ESC[D | ESC O D)
-    pub fn readInput(self: *Terminal, comptime T: type, handler: fn (byte: u8) anyerror!?T) !T {
-        var buf: [8]u8 = undefined;
-        while (true) {
-            const isReady, const bytes = try self.poll(&buf);
-            if (!isReady) return error.FailedToPoll;
+    pub fn readInput(self: *Terminal, buf: []u8) !u8 {
+        const is_ready, const bytes = try self.poll(buf);
+        if (!is_ready) return error.FailedToPoll;
 
-            if (bytes > 1) {
-                if (buf[0] == std.ascii.control_code.esc) {
-                    const byte = switch (buf[1]) {
+        if (bytes > 1) {
+            if (buf[0] == std.ascii.control_code.esc) {
+                return switch (buf[1]) {
+                    'A' => @as(u8, 252),
+                    'B' => @as(u8, 253),
+                    'C' => @as(u8, 254),
+                    'D' => @as(u8, 255),
+                    '[', 'O' => switch (buf[2]) {
                         'A' => @as(u8, 252),
                         'B' => @as(u8, 253),
                         'C' => @as(u8, 254),
                         'D' => @as(u8, 255),
-                        '[', 'O' => switch (buf[2]) {
-                            'A' => @as(u8, 252),
-                            'B' => @as(u8, 253),
-                            'C' => @as(u8, 254),
-                            'D' => @as(u8, 255),
-                            else => return error.UnsupportedEscapeCode,
-                        },
                         else => return error.UnsupportedEscapeCode,
-                    };
-
-                    if (try handler(byte)) |val| {
-                        return val;
-                    }
-                } else {
-                    return error.UnsupportedValue;
-                }
+                    },
+                    else => return error.UnsupportedEscapeCode,
+                };
             } else {
-                if (try handler(buf[0])) |val| {
-                    return val;
-                }
+                return error.UnsupportedValue;
             }
-
-            buf = undefined;
+        } else {
+            return buf[0];
         }
     }
 
