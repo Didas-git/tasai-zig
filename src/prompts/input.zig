@@ -5,9 +5,22 @@ const Terminal = @import("../terminal.zig").Terminal;
 
 const assert = std.debug.assert;
 
+inline fn typeToString(comptime T: type) []const u8 {
+    comptime {
+        return switch (@typeInfo(T)) {
+            .Int => |int| std.fmt.comptimePrint("{s}{d}", .{ switch (int.signedness) {
+                .unsigned => "u",
+                .signed => "i",
+            }, int.bits }),
+            .Float => |flt| std.fmt.comptimePrint("f{d}", .{flt.bits}),
+            else => "default",
+        };
+    }
+}
+
 pub fn InputPrompt(comptime T: type, comptime options: struct {
     message: []const u8,
-    header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
+    header: [3][]const u8 = .{ "?", "\u{1f5f8}", "\u{2715}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
     accept_empty: bool = false,
     hide_cursor: bool = false,
@@ -42,17 +55,28 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         options.message,
         options.footer[0],
     });
+
     const done = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
         options.header[1],
         options.message,
         options.footer[1],
     });
 
+    const err_part_1 = std.fmt.comptimePrint(CSI.SGR.parseString("<f:red><b>{s}<r><r> {s} <d>{s}<r> "), .{
+        options.header[2],
+        options.message,
+        options.footer[0],
+    });
+
+    const err_part_2 = std.fmt.comptimePrint(CSI.SGR.parseString("<d>(Invalid input for type: {s})<r>"), .{typeToString(T)});
+
     return struct {
         const Self = @This();
 
         allocator: std.mem.Allocator,
         array: std.ArrayList(u8),
+
+        var did_error: if (T == []const u8) void else bool = if (T == []const u8) {} else false;
 
         pub fn run(allocator: std.mem.Allocator) !ReturnType {
             const arr = std.ArrayList(u8).init(allocator);
@@ -84,8 +108,35 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             try writer.writeAll((if (comptime options.hide_cursor) CSI.CUH else "") ++ ask);
         }
 
+        // Only use for `int` and `float` checking
+        fn validateInput(input: []const u8) bool {
+            switch (comptime @typeInfo(T)) {
+                .Int => {
+                    _ = std.fmt.parseInt(T, input, 10) catch {
+                        return false;
+                    };
+                    return true;
+                },
+                .Float => {
+                    _ = std.fmt.parseFloat(T, input) catch {
+                        return false;
+                    };
+                    return true;
+                },
+                else => unreachable,
+            }
+        }
+
         fn dispatch(ctx: *anyopaque, term: *Terminal, byte: u8) !?[]const u8 {
             const self: *Self = @ptrCast(@alignCast(ctx));
+            const writer = term.stdout.writer();
+
+            if (comptime T != []const u8) {
+                if (did_error) {
+                    try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
+                    try writer.print(ask ++ "{s}", .{self.array.items});
+                }
+            }
 
             if (byte == std.ascii.control_code.del or byte == 177) {
                 if (self.array.popOrNull()) |_| {
@@ -98,6 +149,15 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             if (byte == std.ascii.control_code.lf or byte == std.ascii.control_code.cr) {
                 if (comptime !options.accept_empty) {
                     if (self.array.items.len <= 0) return null;
+                }
+
+                if (comptime T != []const u8) {
+                    if (!validateInput(self.array.items)) {
+                        did_error = true;
+                        try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
+                        try writer.print(err_part_1 ++ "{s} " ++ err_part_2, .{self.array.items});
+                        return null;
+                    }
                 }
                 return try self.array.toOwnedSlice();
             }
@@ -176,8 +236,6 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 try writer.print("{s}" ++ CSI.SGR.comptimeGet(.Foreground_Cyan) ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
-                // TODO: Validate if the answer fits
-                // into the given integer/float size
                 const num = switch (comptime @typeInfo(T)) {
                     .Int => try std.fmt.parseInt(T, answer, 10),
                     .Float => try std.fmt.parseFloat(T, answer),
