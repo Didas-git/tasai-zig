@@ -1,6 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const RawTerminal = @import("../terminal.zig").RawTerminal;
+const Terminal = @import("../terminal.zig").Terminal;
 
 fn isKV(comptime T: type) bool {
     switch (@typeInfo(T)) {
@@ -46,7 +46,7 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
     const ReturnType = if (options.multiple) []_ReturnType else _ReturnType;
 
     return struct {
-        var term: RawTerminal(true) = undefined;
+        var term: Terminal = undefined;
         var i: usize = 0;
         var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
         var arr: if (options.multiple) std.ArrayList(_ReturnType) else void = if (options.multiple) undefined else {};
@@ -55,7 +55,8 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         pub const run = if (options.multiple) runWithAllocator else runWithoutAllocator;
 
         fn runWithoutAllocator() !ReturnType {
-            term = try RawTerminal(true).init();
+            term = try Terminal.init();
+            try term.enableRawMode();
 
             try term.stdout.lock(.none);
             defer term.stdout.unlock();
@@ -80,7 +81,8 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         }
 
         fn runWithAllocator(allocator: std.mem.Allocator) !ReturnType {
-            term = try RawTerminal(true).init();
+            term = try Terminal.init();
+            try term.enableRawMode();
             arr = std.ArrayList(_ReturnType).init(allocator);
             selected_choices = std.AutoHashMap(usize, void).init(allocator);
 
@@ -124,6 +126,10 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         fn handleNormal(byte: u8) !?T {
             return switch (byte) {
                 std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
+                std.ascii.control_code.etx => {
+                    try term.deinit();
+                    std.process.abort();
+                },
                 252 => {
                     try move(-1);
                     try clearChoices();
@@ -201,6 +207,10 @@ pub fn SelectPrompt(comptime T: type, comptime options: struct {
         fn handleMultiple(byte: u8) !?ReturnType {
             return switch (byte) {
                 std.ascii.control_code.lf, std.ascii.control_code.cr => try arr.toOwnedSlice(),
+                std.ascii.control_code.etx => {
+                    try term.deinit();
+                    std.process.abort();
+                },
                 ' ' => {
                     try selected_choices.put(i, {});
                     try arr.append(if (comptime isKV(T)) options.choices[i].value else options.choices[i]);

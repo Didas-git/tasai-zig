@@ -1,6 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const RawTerminal = @import("../terminal.zig").RawTerminal;
+const Terminal = @import("../terminal.zig").Terminal;
 
 const assert = std.debug.assert;
 
@@ -46,11 +46,12 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
     });
 
     return struct {
-        var term: RawTerminal(true) = undefined;
+        var term: Terminal = undefined;
         var arr: std.ArrayList(u8) = undefined;
 
         pub fn run(allocator: std.mem.Allocator) !if (options.list) []T else T {
-            term = try RawTerminal(true).init();
+            term = try Terminal.init();
+            try term.enableRawMode();
             arr = std.ArrayList(u8).init(allocator);
             defer arr.deinit();
 
@@ -118,6 +119,11 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         }
 
         fn handler(byte: u8) !?[]const u8 {
+            if (byte == std.ascii.control_code.etx) {
+                try term.deinit();
+                std.process.abort();
+            }
+
             if (byte == std.ascii.control_code.del or byte == 177) {
                 if (arr.popOrNull()) |_| {
                     try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.C_EL(0));
@@ -125,6 +131,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
                 return null;
             }
+
             if (byte == std.ascii.control_code.lf or byte == std.ascii.control_code.cr) {
                 if (comptime !options.accept_empty) {
                     if (arr.items.len <= 0) return null;
@@ -156,13 +163,15 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                     },
                     else => unreachable,
                 }
-            } else {
+            } else if (std.ascii.isAlphanumeric(byte)) {
                 if (comptime !options.invisible) {
                     if (comptime options.password) try term.stdout.writeAll(&.{options.password_placeholder}) else try term.stdout.writeAll(&.{byte});
                 }
                 try arr.append(byte);
                 return null;
             }
+
+            return null;
         }
     };
 }

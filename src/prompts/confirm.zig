@@ -1,6 +1,6 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const RawTerminal = @import("../terminal.zig").RawTerminal;
+const Terminal = @import("../terminal.zig").Terminal;
 
 pub fn ConfirmPrompt(comptime options: struct {
     message: []const u8,
@@ -43,11 +43,12 @@ pub fn ConfirmPrompt(comptime options: struct {
     const toggle_yes = std.fmt.comptimePrint(CSI.SGR.parseString("{s} / <f:cyan><u>{s}<r><r>"), .{ options.toggle_names[0], options.toggle_names[1] });
 
     return struct {
-        var term: RawTerminal(true) = undefined;
+        var term: Terminal = undefined;
         var current: if (options.toggle) bool else void = if (options.toggle) false else {};
 
         pub fn run() !bool {
-            term = try RawTerminal(true).init();
+            term = try Terminal.init();
+            try term.enableRawMode();
 
             try term.stdout.lock(.none);
             defer term.stdout.unlock();
@@ -92,11 +93,19 @@ pub fn ConfirmPrompt(comptime options: struct {
                         }
                         return null;
                     },
+                    std.ascii.control_code.etx => {
+                        try term.deinit();
+                        std.process.abort();
+                    },
                     else => null,
                 };
             } else {
                 return switch (byte) {
                     std.ascii.control_code.lf, std.ascii.control_code.cr => options.default_value,
+                    std.ascii.control_code.etx => {
+                        try term.deinit();
+                        std.process.abort();
+                    },
                     'y', 'Y' => true,
                     'n', 'N' => true,
                     else => null,
