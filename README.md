@@ -166,16 +166,16 @@ const SGR = @import("tasai").CSI.SGR;
 // Print "hello" in pink (with a hex code) and "world" in bold blue
 print("{s} {s}\n", .{
     SGR.verboseFormat("Hello", &.{
-            .{ .Color = .{ .Foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
+            .{ .color = .{ .foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
         }, &.{
-            .{ .Attribute = .Default_Foreground_Color },
+            .{ .attribute = .default_foreground_color },
         }),
     SGR.verboseFormat("World", &.{
-            .{ .Attribute = .Bold },
-            .{ .Color = .{ .Foreground = .{ .@"8bit" = 33 } } },
+            .{ .attribute = .bold },
+            .{ .color = .{ .foreground = .{ .@"8bit" = 33 } } },
         }, &.{
-            .{ .Attribute = .Not_Bold_Or_Dim },
-            .{ .Attribute = .Default_Foreground_Color },
+            .{ .attribute = .not_bold_or_dim },
+            .{ .attribute = .default_foreground_color },
         }),
 });
 ```
