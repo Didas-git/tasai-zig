@@ -114,8 +114,8 @@ pub const Modifier = union(enum) {
             g: u8,
             b: u8,
         },
-        normal: enum(u8) { Black = 30, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-        bright: enum(u8) { Black = 90, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+        normal: enum(u8) { black = 30, red, green, yellow, blue, magenta, cyan, white },
+        bright: enum(u8) { black = 90, red, green, yellow, blue, magenta, cyan, white },
     }, background: union(enum) {
         @"8bit": u8,
         @"24bit": struct {
@@ -123,8 +123,8 @@ pub const Modifier = union(enum) {
             g: u8,
             b: u8,
         },
-        normal: enum(u8) { Black = 40, Red, Green, Yellow, Blue, Magenta, Cyan, White },
-        bright: enum(u8) { Black = 100, Red, Green, Yellow, Blue, Magenta, Cyan, White },
+        normal: enum(u8) { black = 40, red, green, yellow, blue, magenta, cyan, white },
+        bright: enum(u8) { black = 100, red, green, yellow, blue, magenta, cyan, white },
     }, underline: union(enum) {
         @"8bit": u8,
         @"24bit": struct {

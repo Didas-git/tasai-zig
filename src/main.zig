@@ -12,42 +12,42 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    // std.debug.print("{s}: {s}!\n", .{
-    //     CSI.SGR.verboseFormat("Test", &.{
-    //         .{ .attribute = .Double_Underline },
-    //         .{ .color = .{ .underline = .{ .@"24bit" = .{ .r = 30, .g = 255, .b = 120 } } } },
-    //     }, &.{
-    //         .{ .attribute = .Not_Underlined },
-    //         .{ .attribute = .Default_Underline_Color },
-    //     }),
-    //     CSI.SGR.verboseFormat(std.fmt.comptimePrint("{s} {s}", .{
-    //         CSI.SGR.verboseFormat("Hello", &.{
-    //             .{ .color = .{ .foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
-    //         }, &.{
-    //             .{ .attribute = .Default_Foreground_Color },
-    //         }),
-    //         CSI.SGR.verboseFormat("World", &.{
-    //             .{ .attribute = .Bold },
-    //             .{ .color = .{ .foreground = .{ .@"8bit" = 33 } } },
-    //         }, &.{
-    //             .{ .attribute = .Not_Bold_Or_Dim },
-    //             .{ .attribute = .Default_Foreground_Color },
-    //         }),
-    //     }), &.{.{ .color = .{ .background = .{ .normal = .Black } } }}, &.{.{ .attribute = .Default_Background_Color }}),
-    // });
+    std.debug.print("{s}: {s}!\n", .{
+        CSI.SGR.verboseFormat("Test", &.{
+            .{ .attribute = .double_underline },
+            .{ .color = .{ .underline = .{ .@"24bit" = .{ .r = 30, .g = 255, .b = 120 } } } },
+        }, &.{
+            .{ .attribute = .not_underlined },
+            .{ .attribute = .default_underline_color },
+        }),
+        CSI.SGR.verboseFormat(std.fmt.comptimePrint("{s} {s}", .{
+            CSI.SGR.verboseFormat("Hello", &.{
+                .{ .color = .{ .foreground = .{ .@"24bit" = .{ .r = 255, .g = 0, .b = 239 } } } },
+            }, &.{
+                .{ .attribute = .default_foreground_color },
+            }),
+            CSI.SGR.verboseFormat("World", &.{
+                .{ .attribute = .bold },
+                .{ .color = .{ .foreground = .{ .@"8bit" = 33 } } },
+            }, &.{
+                .{ .attribute = .not_bold_or_dim },
+                .{ .attribute = .default_foreground_color },
+            }),
+        }), &.{.{ .color = .{ .background = .{ .normal = .black } } }}, &.{.{ .attribute = .default_background_color }}),
+    });
 
-    // const str = CSI.SGR.parseString("<du><u:30,255,120>Test<r><r>: <b:black><f:#ff00ef>Hello<r> <f:33><b>World<r><r><r>!");
-    // std.debug.print("{s}\n", .{str});
-    // std.debug.print("{s}\n", .{CSI.SGR.parseString("This: <b><f:red>\\<<r> should print without issues<r>")});
+    const str = CSI.SGR.parseString("<du><u:30,255,120>Test<r><r>: <b:black><f:#ff00ef>Hello<r> <f:33><b>World<r><r><r>!");
+    std.debug.print("{s}\n", .{str});
+    std.debug.print("{s}\n", .{CSI.SGR.parseString("This: <b><f:red>\\<<r> should print without issues<r>")});
 
-    // std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", null)});
-    // const Params = struct { id: u8 };
-    // std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
-    // std.debug.print("{s}\n", .{CSI.SGR.parseString("<b:hsi:0,0,0><f:hsv:0,255,255>Hello<r> <f:hsl:0.1,1,0.5>World<r><r>")});
+    std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", null)});
+    const Params = struct { id: u8 };
+    std.debug.print("{s}\n", .{OSC.hyperlink("My link", "https://google.com/", Params{ .id = 1 })});
+    std.debug.print("{s}\n", .{CSI.SGR.parseString("<b:hsi:0,0,0><f:hsv:0,255,255>Hello<r> <f:hsl:0.1,1,0.5>World<r><r>")});
 
-    // std.debug.print("{s}\n", .{tasai.comptimeStrip(str)});
+    std.debug.print("{s}\n", .{tasai.comptimeStrip(str)});
 
-    // std.debug.print("{s}\n", .{try tasai.strip(allocator, str)});
+    std.debug.print("{s}\n", .{try tasai.strip(allocator, str)});
 
     const stdout = std.io.getStdOut();
     const writer = stdout.writer();

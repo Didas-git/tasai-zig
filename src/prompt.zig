@@ -1,5 +1,5 @@
 const std = @import("std");
-const Terminal = @import("../terminal.zig").Terminal;
+const Terminal = @import("./Terminal.zig");
 
 pub fn Prompt(comptime DT: type, comptime FT: type) type {
     return struct {

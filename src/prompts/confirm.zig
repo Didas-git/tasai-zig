@@ -1,7 +1,7 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const Prompt = @import("./prompt.zig").Prompt(bool, void);
-const Terminal = @import("../terminal.zig").Terminal;
+const Terminal = @import("../Terminal.zig");
+const Prompt = @import("../prompt.zig").Prompt(bool, void);
 
 pub fn ConfirmPrompt(comptime options: struct {
     message: []const u8,

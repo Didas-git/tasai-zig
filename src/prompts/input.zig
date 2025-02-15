@@ -1,7 +1,7 @@
 const std = @import("std");
 const CSI = @import("../csi.zig");
-const Prompt = @import("./prompt.zig").Prompt;
-const Terminal = @import("../terminal.zig").Terminal;
+const Terminal = @import("../Terminal.zig");
+const Prompt = @import("../prompt.zig").Prompt;
 
 const assert = std.debug.assert;
 

@@ -2,7 +2,9 @@ const std = @import("std");
 
 pub usingnamespace @import("./ansi.zig");
 
-pub const Color = @import("Color.zig");
+pub const Prompt = @import("./prompt.zig").Prompt;
+pub const Terminal = @import("./Terminal.zig");
+pub const Color = @import("./Color.zig");
 pub const CSI = @import("./csi.zig");
 pub const OSC = @import("./osc.zig");
 
