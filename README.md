@@ -155,6 +155,27 @@ print(SGR.parseString("<f:#ff00ef>hello<r> <f:33><b>world<r><r>\n"), .{});
 print(SGR.parseString("This will print <f:red>\\<<r> in red\n"), .{});
 ```
 
+#### Adding custom tags
+
+Tasai exposes the `Parser` which allows you to have your own custom tags.
+
+Special tags like `f:`, `b:` and `u:` cannot be overwritten and will always work.
+
+```zig
+const print = @import("std").debug.print;
+const SGR = @import("tasai").CSI.SGR;
+
+const parser = SGR.Parser(struct {
+    // Yes you can override default tags
+    pub const b = .{SGR.Attribute.slow_blink, SGR.Attribute.not_blinking};
+    pub const this_is_bold = .{SGR.Attribute.bold, SGR.Attribute.not_bold_or_dim};
+});
+
+// Print blinking bold "hello" in pink (with a hex code)
+print(parser.parseString("<b><this_is_bold><f:#ff00ef>hello<r><r><r>"), .{});
+
+```
+
 ### Verbose API
 
 While this API is rather overkill it can be rather useful given it includes all* the SGR codes and is not limited to a few set of them.

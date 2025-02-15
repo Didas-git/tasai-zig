@@ -34,7 +34,7 @@ pub const Attribute = enum(u8) {
     not_bold_or_dim,
     not_italic,
     not_underlined,
-    Not_blinking,
+    not_blinking,
     proportional_spacing,
     not_inverted,
     reveal,
@@ -218,238 +218,263 @@ fn CreateAvailableColors(comptime additive: u8) type {
 const ForegroundColors = CreateAvailableColors(0);
 const BackgroundColors = CreateAvailableColors(10);
 
-/// Currently supported tokens:
-/// - Normal Attributes:
-///     - `r` - Smart Reset
-///     - `b` - Bold
-///     - `d` - Dim
-///     - `i` - Italic
-///     - `u` - Underline
-///     - `s` - Strike through (crossed)
-///     - `o` - Overlined
-///     - `du` - Double Underline
-///     - `inv` - Invert
-/// - Colors:
-///     - `f:<color>` - 3bit & 4bit Foreground Coloring (prefix with `b` for bright colors) ex: `f:bRed`, `f:blue`
-///     - `f:n` - 8bit (0 - 255) Foreground Coloring
-///     - `f:r,g,b` - 24bit (rgb) Foreground Coloring
-///     - `f:#ffffff` - Hex code (24bit)
-///     - `f:<color_space>:x,y,z` - 24bit color using specific color space
-///     - `b:<color>` - 3bit & 4bit Background Coloring (prefix with `b` for bright colors)
-///     - `b:n` - 8bit (0 - 255) Background Coloring
-///     - `b:r,g,b` - 24bit (rgb) Background Coloring
-///     - `b:#ffffff` - Hex code (24bit)
-///     - `b:<color_space>:x,y,z` - 24bit color using specific color space
-///     - `u:n` - 8bit (0 - 255) Underline Coloring
-///     - `u:r,g,b` - 24bit (rgb) Underline Coloring
-///     - `u:#ffffff` - Hex code (24bit)
-///     - `u:<color_space>:x,y,z` - 24bit color using specific color space
-///
-/// Available color spaces are: `hsv`, `hsl` and `hsi`
-pub inline fn parseString(comptime text: []const u8) []const u8 {
-    comptime {
-        var final_text: []const u8 = &.{};
-        var stack: []const Attribute = &.{};
-        var i: usize = 0;
-        var previous_is_token: bool = false;
-        // Maybe we should look into using the tokenizer in the std?
-        while (i < text.len) : (i += 1) {
-            const char = text[i];
-            if (char != '<') {
-                final_text = final_text ++ @as([]const u8, &.{char});
-                previous_is_token = false;
-                continue;
-            }
+const default_tags = struct {
+    const b = .{ Attribute.bold, Attribute.not_bold_or_dim };
+    const d = .{ Attribute.dim, Attribute.not_bold_or_dim };
+    const i = .{ Attribute.italic, Attribute.not_italic };
+    const u = .{ Attribute.underline, Attribute.not_underlined };
+    const s = .{ Attribute.strike_through, Attribute.not_crossed_out };
+    const o = .{ Attribute.overlined, Attribute.not_overlined };
+    const du = .{ Attribute.double_underline, Attribute.not_underlined };
+    const inv = .{ Attribute.invert, Attribute.not_inverted };
+};
 
-            // If the user escaped the character then we don't read it as a token
-            if (i != 0 and text[i - 1] == '\\') {
-                final_text = final_text[0 .. final_text.len - 1] ++ @as([]const u8, &.{char});
-                previous_is_token = false;
-                continue;
-            }
+/// Custom tags cannot have `:` as their second byte
+/// it will cause them to not be detected
+pub fn Parser(comptime custom_tags: anytype) type {
+    if (@TypeOf(custom_tags) != void) {
+        switch (@typeInfo(custom_tags)) {
+            // TODO: improve validation of struct
+            .Struct => {},
+            .Void => {},
+            else => @compileError(std.fmt.comptimePrint("Invalid type: expected 'struct' or 'void' got: {any}", .{@typeInfo((custom_tags))})),
+        }
+    }
 
-            i += 1;
-            const start = i;
+    return struct {
+        /// Special Tags:
+        /// - `r` - Smart Reset
+        ///
+        /// Default Tags:
+        /// - `b` - Bold
+        /// - `d` - Dim
+        /// - `i` - Italic
+        /// - `u` - Underline
+        /// - `s` - Strike through (crossed)
+        /// - `o` - Overlined
+        /// - `du` - Double Underline
+        /// - `inv` - Invert
+        ///
+        /// Coloring:
+        /// - `f:<color>` - 3bit & 4bit Foreground Coloring (prefix with `b` for bright colors) ex: `f:bRed`, `f:blue`
+        /// - `f:n` - 8bit (0 - 255) Foreground Coloring
+        /// - `f:r,g,b` - 24bit (rgb) Foreground Coloring
+        /// - `f:#ffffff` - Hex code (24bit)
+        /// - `f:<color_space>:x,y,z` - 24bit color using specific color space
+        /// - `b:<color>` - 3bit & 4bit Background Coloring (prefix with `b` for bright colors)
+        /// - `b:n` - 8bit (0 - 255) Background Coloring
+        /// - `b:r,g,b` - 24bit (rgb) Background Coloring
+        /// - `b:#ffffff` - Hex code (24bit)
+        /// - `b:<color_space>:x,y,z` - 24bit color using specific color space
+        /// - `u:n` - 8bit (0 - 255) Underline Coloring
+        /// - `u:r,g,b` - 24bit (rgb) Underline Coloring
+        /// - `u:#ffffff` - Hex code (24bit)
+        /// - `u:<color_space>:x,y,z` - 24bit color using specific color space
+        ///
+        /// Available color spaces are: `hsv`, `hsl` and `hsi`
+        pub inline fn parseString(comptime text: []const u8) []const u8 {
+            comptime {
+                var final_text: []const u8 = &.{};
+                var stack: []const Attribute = &.{};
+                var i: usize = 0;
+                var previous_is_tag: bool = false;
 
-            while (true) {
-                if (text[i] == '>') break;
-                i = i + 1;
-                if (i > text.len) @compileError("Wrongly formatted text.");
-            }
-
-            const token = text[start..i];
-            switch (token.len) {
-                0 => @compileError("Invalid Token."),
-                1 => switch (token[0]) {
-                    'r' => {
-                        if (stack.len == 0) @compileError(fmt.comptimePrint("Extra reset tag found at index '{d}'", .{start + 1}));
-                        appendAttribute(&final_text, stack[stack.len - 1], previous_is_token);
-                        stack = stack[0 .. stack.len - 1];
-                    },
-                    'b' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_bold_or_dim});
-                        appendAttribute(&final_text, .bold, previous_is_token);
-                    },
-                    'd' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_bold_or_dim});
-                        appendAttribute(&final_text, .dim, previous_is_token);
-                    },
-                    'i' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_italic});
-                        appendAttribute(&final_text, .italic, previous_is_token);
-                    },
-                    'u' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_underlined});
-                        appendAttribute(&final_text, .underline, previous_is_token);
-                    },
-                    's' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_crossed_out});
-                        appendAttribute(&final_text, .strike_through, previous_is_token);
-                    },
-                    'o' => {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_overlined});
-                        appendAttribute(&final_text, .overlined, previous_is_token);
-                    },
-                    else => @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token})),
-                },
-                else => {
-                    if (mem.eql(u8, token, "du")) {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_underlined});
-                        final_text = if (previous_is_token)
-                            final_text[0 .. final_text.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(Attribute.double_underline)})
-                        else
-                            final_text ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(Attribute.double_underline)});
-                    } else if (mem.eql(u8, token, "inv")) {
-                        stack = stack ++ @as([]const Attribute, &.{Attribute.not_inverted});
-                        appendAttribute(&final_text, .Invert, previous_is_token);
-                    } else if (token[0] == 'f') {
-                        parseColorAttribute(&final_text, &stack, token, .set_foreground_color, .default_foreground_color, previous_is_token);
-                    } else if (token[0] == 'b') {
-                        parseColorAttribute(&final_text, &stack, token, .set_background_color, .default_background_color, previous_is_token);
-                    } else if (token[0] == 'u') {
-                        parseColorAttribute(&final_text, &stack, token, .set_underline_color, .default_underline_color, previous_is_token);
-                    } else {
-                        @compileError(fmt.comptimePrint("Invalid Token: '{s}'.", .{token}));
+                while (i < text.len) : (i += 1) {
+                    const char = text[i];
+                    if (char != '<') {
+                        final_text = final_text ++ @as([]const u8, &.{char});
+                        previous_is_tag = false;
+                        continue;
                     }
-                },
+
+                    // If the user escaped the character then we don't read it as a token
+                    if (i != 0 and text[i - 1] == '\\') {
+                        final_text = final_text[0 .. final_text.len - 1] ++ @as([]const u8, &.{char});
+                        previous_is_tag = false;
+                        continue;
+                    }
+
+                    i += 1;
+                    const start = i;
+
+                    while (true) {
+                        if (text[i] == '>') break;
+                        i = i + 1;
+                        if (i > text.len) @compileError("Wrongly formatted text.");
+                    }
+
+                    const tag = text[start..i];
+                    if (tag.len == 0) {
+                        @compileError("Invalid Empty Tag");
+                    } else if (tag.len == 1) {
+                        if (tag[0] == 'r') {
+                            if (stack.len == 0) @compileError(fmt.comptimePrint("Extra reset tag found at index '{d}'", .{start + 1}));
+                            appendAttribute(&final_text, stack[stack.len - 1], previous_is_tag);
+                            stack = stack[0 .. stack.len - 1];
+                        } else {
+                            const field = if (@TypeOf(custom_tags) != void and @hasDecl(custom_tags, tag))
+                                @field(custom_tags, tag)
+                            else if (@hasDecl(default_tags, tag))
+                                @field(default_tags, tag)
+                            else
+                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
+
+                            appendAttribute(&final_text, field[0], previous_is_tag);
+                            stack = stack ++ @as([]const Attribute, &.{field[1]});
+                        }
+                    } else {
+                        if (tag[1] == ':') {
+                            if (tag[0] == 'f') {
+                                parseColorAttribute(&final_text, &stack, tag, .{ .set_foreground_color, .default_foreground_color }, previous_is_tag);
+                            } else if (tag[0] == 'b') {
+                                parseColorAttribute(&final_text, &stack, tag, .{ .set_background_color, .default_background_color }, previous_is_tag);
+                            } else if (tag[0] == 'u') {
+                                parseColorAttribute(&final_text, &stack, tag, .{ .set_underline_color, .default_underline_color }, previous_is_tag);
+                            } else {
+                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
+                            }
+                        } else {
+                            const field = if (@TypeOf(custom_tags) != void and @hasDecl(custom_tags, tag))
+                                @field(custom_tags, tag)
+                            else if (@hasDecl(default_tags, tag))
+                                @field(default_tags, tag)
+                            else
+                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
+
+                            appendAttribute(&final_text, field[0], previous_is_tag);
+                            stack = stack ++ @as([]const Attribute, &.{field[1]});
+                        }
+                    }
+
+                    previous_is_tag = true;
+                }
+
+                if (stack.len > 0) @compileError("Text has an unclosed tag.");
+                return final_text;
+            }
+        }
+
+        fn appendAttribute(
+            buf: *[]const u8,
+            opening: Attribute,
+            trim_last_byte: bool,
+        ) void {
+            comptime {
+                buf.* = if (trim_last_byte)
+                    buf.*[0 .. buf.*.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(opening)})
+                else
+                    buf.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(opening)});
+            }
+        }
+
+        fn parseColorAttribute(
+            buf: *[]const u8,
+            stack: *[]const Attribute,
+            tag: []const u8,
+            attributes: struct { Attribute, Attribute },
+            trim_last_byte: bool,
+        ) void {
+            const color_part = tag[2..];
+            if (color_part.len < 1) @compileError("No valid color was passed.");
+
+            const opening, const closing = attributes;
+            const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
+
+            if (possibly_a_int == error.InvalidCharacter) {
+                // Handle hex as 24bit
+                if (color_part[0] == '#') {
+                    const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
+                    append24BitColor(buf, color, opening, trim_last_byte);
+                    // Handle other color spaces as 24bit
+                } else if (color_part[0] == 'h') {
+                    const color_space = color_part[0..3];
+                    const values = color_part[4..];
+                    if (color_space[1] != 's' or (color_space[2] != 'l' and color_space[2] != 'i' and color_space[2] != 'v')) @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
+
+                    var temp: [3]u8 = undefined;
+                    const upper_color_space = std.ascii.upperString(&temp, color_space);
+                    const parsed_color_space = parseStringArbitraryColorSpace(values);
+                    const color = @call(.auto, @field(Color, fmt.comptimePrint("from{s}", .{upper_color_space})), .{
+                        parsed_color_space[0],
+                        parsed_color_space[1],
+                        parsed_color_space[2],
+                        null,
+                    });
+
+                    append24BitColor(buf, color, opening, trim_last_byte);
+                    // Handle 4bit
+                } else {
+                    const color = switch (opening) {
+                        .set_foreground_color => @field(ForegroundColors, color_part),
+                        .set_background_color => @field(BackgroundColors, color_part),
+                        .set_underline_color => @compileError("Underline doesn't support 4bit colors."),
+                        else => @compileError("Invalid Attribute"),
+                    };
+
+                    appendAttribute(buf, @enumFromInt(color.open), trim_last_byte);
+                }
+                // Handle 8bit colors
+            } else if (color_part.len <= 3) {
+                append8BitColor(buf, color_part, opening, trim_last_byte);
+                // Handle 24 bit colors
+            } else {
+                append24BitColor(buf, parseStringRGB(color_part), opening, trim_last_byte);
             }
 
-            previous_is_token = true;
+            stack.* = stack.* ++ @as([]const Attribute, &.{closing});
         }
 
-        if (stack.len > 0) @compileError("Text has an unclosed token.");
-        return final_text;
-    }
-}
-
-fn parseColorAttribute(
-    buf: *[]const u8,
-    stack: *[]const Attribute,
-    token: []const u8,
-    opening_attribute: Attribute,
-    closing_attribute: Attribute,
-    trim_last_byte: bool,
-) void {
-    const color_part = token[2..];
-    if (color_part.len < 1) @compileError("No valid color was passed.");
-    const possibly_a_int = fmt.parseInt(u8, &.{color_part[0]}, 10);
-
-    if (possibly_a_int == error.InvalidCharacter) {
-        // Handle hex as 24bit
-        if (color_part[0] == '#') {
-            const color = Color.fromHex(color_part) catch @compileError(fmt.comptimePrint("Invalid hex color: '{s}'", .{color_part}));
-            append24BitColor(buf, color, opening_attribute, trim_last_byte);
-            // Handle other color spaces as 24bit
-        } else if (color_part[0] == 'h') {
-            const color_space = color_part[0..3];
-            const values = color_part[4..];
-            if (color_space[1] != 's' or (color_space[2] != 'l' and color_space[2] != 'i' and color_space[2] != 'v')) @compileError(fmt.comptimePrint("Invalid color space '{s}'", .{color_space}));
-
-            var temp: [3]u8 = undefined;
-            const upper_color_space = std.ascii.upperString(&temp, color_space);
-            const parsed_color_space = parseStringArbitraryColorSpace(values);
-            const color = @call(.auto, @field(Color, fmt.comptimePrint("from{s}", .{upper_color_space})), .{
-                parsed_color_space[0],
-                parsed_color_space[1],
-                parsed_color_space[2],
-                null,
-            });
-
-            append24BitColor(buf, color, opening_attribute, trim_last_byte);
-            // Handle 4bit
-        } else {
-            const color = switch (opening_attribute) {
-                .set_foreground_color => @field(ForegroundColors, color_part),
-                .set_background_color => @field(BackgroundColors, color_part),
-                .set_underline_color => @compileError("Underline doesn't support 4bit colors."),
-                else => @compileError("Invalid Attribute"),
-            };
-
-            appendAttribute(buf, @enumFromInt(color.open), trim_last_byte);
+        fn append24BitColor(
+            buf: *[]const u8,
+            color: Color,
+            open_code: Attribute,
+            trim_last_byte: bool,
+        ) void {
+            comptime {
+                buf.* = if (trim_last_byte)
+                    buf.*[0 .. buf.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() })
+                else
+                    buf.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() });
+            }
         }
-        // Handle 8bit colors
-    } else if (color_part.len <= 3) {
-        append8BitColor(buf, color_part, opening_attribute, trim_last_byte);
-        // Handle 24 bit colors
-    } else {
-        append24BitColor(buf, parseStringRGB(color_part), opening_attribute, trim_last_byte);
-    }
 
-    stack.* = stack.* ++ @as([]const Attribute, &.{closing_attribute});
+        fn append8BitColor(
+            buff: *[]const u8,
+            color_part: []const u8,
+            open_code: Attribute,
+            trim_last_byte: bool,
+        ) void {
+            const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
+            buff.* = if (trim_last_byte)
+                buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(open_code), color })
+            else
+                buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};5;{d}m", .{ @intFromEnum(open_code), color });
+        }
+
+        fn parseStringRGB(
+            color_part: []const u8,
+        ) Color {
+            // 11 is the max length of `rrr,ggg,bbb`
+            if (color_part.len > 11) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
+
+            const rgb = parseStringArbitraryColorSpace(color_part);
+
+            return Color.init(rgb[0], rgb[1], rgb[2], null);
+        }
+
+        fn parseStringArbitraryColorSpace(color_part: []const u8) []const f64 {
+            var pieces: []const f64 = &.{};
+            var iterator = mem.split(u8, color_part, ",");
+
+            while (iterator.next()) |color_channel| {
+                const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));
+                pieces = pieces ++ @as([]const f64, &.{channel_code});
+            }
+
+            if (pieces.len > 3) @compileError("Invalid color part");
+            return pieces;
+        }
+    };
 }
 
-fn appendAttribute(buff: *[]const u8, attribute: Attribute, trim_last_byte: bool) void {
-    buff.* = if (trim_last_byte)
-        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d}m", .{@intFromEnum(attribute)})
-    else
-        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d}m", .{@intFromEnum(attribute)});
-}
-
-fn append8BitColor(
-    buff: *[]const u8,
-    color_part: []const u8,
-    open_code: Attribute,
-    trim_last_byte: bool,
-) void {
-    const color = fmt.parseInt(u8, color_part, 10) catch @compileError("Failed to parse color");
-    buff.* = if (trim_last_byte)
-        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};5;{d}m", .{ @intFromEnum(open_code), color })
-    else
-        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};5;{d}m", .{ @intFromEnum(open_code), color });
-}
-
-fn append24BitColor(
-    buff: *[]const u8,
-    color: Color,
-    open_code: Attribute,
-    trim_last_byte: bool,
-) void {
-    buff.* = if (trim_last_byte)
-        buff.*[0 .. buff.*.len - 1] ++ fmt.comptimePrint(";{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() })
-    else
-        buff.* ++ fmt.comptimePrint(FeEscapeSequence.CSI ++ "{d};2;{d};{d};{d}m", .{ @intFromEnum(open_code), color.red8Bit(), color.green8Bit(), color.blue8Bit() });
-}
-
-fn parseStringRGB(
-    color_part: []const u8,
-) Color {
-    // 11 is the max length of `rrr,ggg,bbb`
-    if (color_part.len > 11) @compileError(fmt.comptimePrint("Invalid color: '{s}'", .{color_part}));
-
-    const rgb = parseStringArbitraryColorSpace(color_part);
-
-    return Color.init(rgb[0], rgb[1], rgb[2], null);
-}
-
-fn parseStringArbitraryColorSpace(color_part: []const u8) []const f64 {
-    var pieces: []const f64 = &.{};
-    var iterator = mem.split(u8, color_part, ",");
-
-    while (iterator.next()) |color_channel| {
-        const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));
-        pieces = pieces ++ @as([]const f64, &.{channel_code});
-    }
-
-    if (pieces.len > 3) @compileError("Invalid color part");
-    return pieces;
-}
+pub const parseString = Parser({}).parseString;
