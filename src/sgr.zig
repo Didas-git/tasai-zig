@@ -306,44 +306,30 @@ pub fn Parser(comptime custom_tags: anytype) type {
                     const tag = text[start..i];
                     if (tag.len == 0) {
                         @compileError("Invalid Empty Tag");
-                    } else if (tag.len == 1) {
-                        if (tag[0] == 'r') {
-                            if (stack.len == 0) @compileError(fmt.comptimePrint("Extra reset tag found at index '{d}'", .{start + 1}));
-                            appendAttribute(&final_text, stack[stack.len - 1], previous_is_tag);
-                            stack = stack[0 .. stack.len - 1];
+                    } else if (tag.len == 1 and tag[0] == 'r') {
+                        if (stack.len == 0) @compileError(fmt.comptimePrint("Extra reset tag found at index '{d}'", .{start + 1}));
+                        appendAttribute(&final_text, stack[stack.len - 1], previous_is_tag);
+                        stack = stack[0 .. stack.len - 1];
+                    } else if (tag.len > 1 and tag[1] == ':') {
+                        if (tag[0] == 'f') {
+                            parseColorAttribute(&final_text, &stack, tag, .{ .set_foreground_color, .default_foreground_color }, previous_is_tag);
+                        } else if (tag[0] == 'b') {
+                            parseColorAttribute(&final_text, &stack, tag, .{ .set_background_color, .default_background_color }, previous_is_tag);
+                        } else if (tag[0] == 'u') {
+                            parseColorAttribute(&final_text, &stack, tag, .{ .set_underline_color, .default_underline_color }, previous_is_tag);
                         } else {
-                            const field = if (@TypeOf(custom_tags) != void and @hasDecl(custom_tags, tag))
-                                @field(custom_tags, tag)
-                            else if (@hasDecl(default_tags, tag))
-                                @field(default_tags, tag)
-                            else
-                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
-
-                            appendAttribute(&final_text, field[0], previous_is_tag);
-                            stack = stack ++ @as([]const Attribute, &.{field[1]});
+                            @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
                         }
                     } else {
-                        if (tag[1] == ':') {
-                            if (tag[0] == 'f') {
-                                parseColorAttribute(&final_text, &stack, tag, .{ .set_foreground_color, .default_foreground_color }, previous_is_tag);
-                            } else if (tag[0] == 'b') {
-                                parseColorAttribute(&final_text, &stack, tag, .{ .set_background_color, .default_background_color }, previous_is_tag);
-                            } else if (tag[0] == 'u') {
-                                parseColorAttribute(&final_text, &stack, tag, .{ .set_underline_color, .default_underline_color }, previous_is_tag);
-                            } else {
-                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
-                            }
-                        } else {
-                            const field = if (@TypeOf(custom_tags) != void and @hasDecl(custom_tags, tag))
-                                @field(custom_tags, tag)
-                            else if (@hasDecl(default_tags, tag))
-                                @field(default_tags, tag)
-                            else
-                                @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
+                        const field = if (@TypeOf(custom_tags) != void and @hasDecl(custom_tags, tag))
+                            @field(custom_tags, tag)
+                        else if (@hasDecl(default_tags, tag))
+                            @field(default_tags, tag)
+                        else
+                            @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
 
-                            appendAttribute(&final_text, field[0], previous_is_tag);
-                            stack = stack ++ @as([]const Attribute, &.{field[1]});
-                        }
+                        appendAttribute(&final_text, field[0], previous_is_tag);
+                        stack = stack ++ @as([]const Attribute, &.{field[1]});
                     }
 
                     previous_is_tag = true;
