@@ -1,3 +1,4 @@
+const FeEscapeSequence = @import("./ansi.zig").FeEscapeSequence;
 const std = @import("std");
 const fmt = std.fmt;
 
@@ -14,6 +15,6 @@ pub inline fn hyperlink(comptime alt_text: []const u8, comptime link: []const u8
             else => @compileError("Options should be a struct."),
         }
 
-        return "\x1B]8;" ++ (if (params.len > 0) params[0 .. params.len - 1] else "") ++ ";" ++ link ++ "\x1B\\" ++ alt_text ++ "\x1B]8;;\x1B\\";
+        return FeEscapeSequence.OSC ++ "8;" ++ (if (params.len > 0) params[0 .. params.len - 1] else "") ++ ";" ++ link ++ FeEscapeSequence.ST ++ alt_text ++ FeEscapeSequence.OSC ++ "8;;" ++ FeEscapeSequence.ST;
     }
 }

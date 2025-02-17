@@ -2,7 +2,12 @@
     "cSpell.words": [
         "Overlined",
         "RGBA",
-        "tasai"
+        "syscall",
+        "tasai",
+        "tcgetattr",
+        "tcsetattr",
+        "termios",
+        "vtable"
     ],
     "zig.zls.enableBuildOnSave": true
 }
