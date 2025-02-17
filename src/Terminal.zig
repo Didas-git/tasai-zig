@@ -86,7 +86,7 @@ fn enableRawModeWindows(self: *Terminal) !void {
         .EXTENDED_FLAGS = 1,
     })));
 
-    try Windows.setConsoleMode(self.stdout.handle, @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_OUTPUT{
+    try Windows.setConsoleMode(self.stdout.handle, original_stdout | @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_OUTPUT{
         .PROCESSED_OUTPUT = 1,
         .VIRTUAL_TERMINAL_PROCESSING = 1,
     })));
