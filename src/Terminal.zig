@@ -26,8 +26,8 @@ pub fn init() !Terminal {
             .termios = {},
             .modes = .{
                 .codepage = 0,
-                .input = @bitCast(0),
-                .output = @bitCast(0),
+                .input = .{},
+                .output = .{},
             },
         },
         else => .{
