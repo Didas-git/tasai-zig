@@ -116,9 +116,9 @@ fn disableRawModePosix(self: Terminal) !void {
 }
 
 fn disableRawModeWindows(self: Terminal) !void {
-    _ = windows.kernel32.SetConsoleOutputCP(self.initial_codepage);
-    Windows.setConsoleMode(self.stdin, self.initial_input_mode) catch {};
-    Windows.setConsoleMode(self.stdout, self.initial_output_mode) catch {};
+    _ = windows.kernel32.SetConsoleOutputCP(self.modes.codepage);
+    Windows.setConsoleMode(self.stdin, self.modes.input) catch {};
+    Windows.setConsoleMode(self.stdout, self.modes.output) catch {};
     windows.CloseHandle(self.stdin);
     windows.CloseHandle(self.stdout);
 }
@@ -222,9 +222,9 @@ fn pollWindows(self: *Terminal, buf: []u8) !struct { bool, usize } {
         if (Windows.ReadConsoleInputW(self.stdin.handle, &input_record, 1, &event_count) == 0)
             return windows.unexpectedError(windows.kernel32.GetLastError());
 
-        switch (input_record.Event) {
+        switch (input_record.EventType) {
             0x0010 => {
-                return .{ bool, input_record.Event.KeyEvent.uChar.AsciiChar };
+                return .{ true, input_record.Event.KeyEvent.uChar.AsciiChar };
             },
             else => continue,
         }
