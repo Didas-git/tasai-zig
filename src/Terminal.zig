@@ -81,8 +81,8 @@ fn enableRawModeWindows(self: *Terminal) !void {
     const original_stdin = try Windows.getConsoleMode(self.stdin.handle);
     const original_stdout = try Windows.getConsoleMode(self.stdout.handle);
 
-    try Windows.setConsoleMode(self.stdin.handle, original_stdin | Windows.ENABLE_VIRTUAL_TERMINAL_INPUT);
-    try Windows.setConsoleMode(self.stdout.handle, original_stdout | Windows.PROCESSED_OUTPUT | Windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    try Windows.setConsoleMode(self.stdin.handle, Windows.ENABLE_VIRTUAL_TERMINAL_INPUT);
+    try Windows.setConsoleMode(self.stdout.handle, Windows.PROCESSED_OUTPUT | Windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
     if (windows.kernel32.SetConsoleOutputCP(65001) == 0)
         return windows.unexpectedError(windows.kernel32.GetLastError());
