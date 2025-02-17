@@ -219,7 +219,7 @@ fn pollWindows(self: *Terminal, buf: []u8) !struct { bool, usize } {
     while (true) {
         var event_count: u32 = 0;
         var input_record: Windows.INPUT_RECORD = undefined;
-        if (Windows.ReadConsoleInputW(self.stdin, &input_record, 1, &event_count) == 0)
+        if (Windows.ReadConsoleInputW(self.stdin.handle, &input_record, 1, &event_count) == 0)
             return windows.unexpectedError(windows.kernel32.GetLastError());
 
         switch (input_record.Event) {
