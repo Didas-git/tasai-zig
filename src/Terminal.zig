@@ -16,8 +16,8 @@ const WindowsModes = struct {
 fd: if (is_windows) void else std.posix.fd_t,
 termios: if (is_windows) void else ?std.posix.termios,
 modes: if (is_windows) WindowsModes else void,
-stdout: if (is_windows) windows.HANDLE else std.fs.File,
-stdin: if (is_windows) windows.HANDLE else std.fs.File,
+stdout: std.fs.File,
+stdin: std.fs.File,
 
 pub fn init() !Terminal {
     return switch (builtin.os.tag) {
