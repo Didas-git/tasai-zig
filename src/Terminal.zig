@@ -28,9 +28,9 @@ pub fn init() !Terminal {
                 .codepage = 0,
                 .input = .{},
                 .output = .{},
-                .stdout = std.io.getStdOut(),
-                .stdin = std.io.getStdIn(),
             },
+            .stdout = std.io.getStdOut(),
+            .stdin = std.io.getStdIn(),
         },
         else => .{
             .fd = try std.posix.open("/dev/tty", .{ .ACCMODE = .RDWR }, 0),
