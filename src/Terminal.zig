@@ -117,15 +117,15 @@ fn disableRawModePosix(self: Terminal) !void {
 
 fn disableRawModeWindows(self: Terminal) !void {
     _ = windows.kernel32.SetConsoleOutputCP(self.modes.codepage);
-    Windows.setConsoleMode(self.stdin, self.modes.input) catch {};
-    Windows.setConsoleMode(self.stdout, self.modes.output) catch {};
-    windows.CloseHandle(self.stdin);
-    windows.CloseHandle(self.stdout);
+    Windows.setConsoleMode(self.stdin.handle, self.modes.input) catch {};
+    Windows.setConsoleMode(self.stdout.handle, self.modes.output) catch {};
+    windows.CloseHandle(self.stdin.handle);
+    windows.CloseHandle(self.stdout.handle);
 }
 
 pub fn disableRawMode(self: Terminal) !void {
     switch (builtin.os.tag) {
-        .windows => self.disableRawModeWindows(),
+        .windows => try self.disableRawModeWindows(),
         else => try self.disableRawModePosix(),
     }
 }
@@ -134,7 +134,7 @@ pub fn deinit(self: Terminal) !void {
     try self.stdout.writeAll(CSI.CUS);
     try self.disableRawMode();
 
-    if (builtin.os.tag != .macos) std.posix.close(self.fd);
+    if (builtin.os.tag != .macos and builtin.os.tag != .windows) std.posix.close(self.fd);
 }
 
 /// The handler has 4 bytes as special cases:
