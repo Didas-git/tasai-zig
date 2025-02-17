@@ -16,8 +16,8 @@ const WindowsModes = struct {
 fd: if (is_windows) void else std.posix.fd_t,
 termios: if (is_windows) void else ?std.posix.termios,
 modes: if (is_windows) WindowsModes else void,
-stdout: std.fs.File,
-stdin: std.fs.File,
+stdout: if (is_windows) windows.HANDLE else std.fs.File,
+stdin: if (is_windows) windows.HANDLE else std.fs.File,
 
 pub fn init() !Terminal {
     return switch (builtin.os.tag) {
@@ -82,8 +82,6 @@ fn enableRawModeWindows(self: *Terminal) !void {
     const original_stdout = try Windows.getConsoleMode(Windows.CONSOLE_MODE_OUTPUT, self.stdout.handle);
 
     try Windows.setConsoleMode(self.stdin.handle, Windows.CONSOLE_MODE_INPUT{
-        .WINDOW_INPUT = 1,
-        .MOUSE_INPUT = 1,
         .EXTENDED_FLAGS = 1,
     });
 
@@ -172,9 +170,11 @@ pub fn readInput(self: *Terminal, buf: []u8) !u8 {
     }
 }
 
+const poll = if (is_windows) pollWindows else pollPosix;
+
 // This is an adaptation of the std implementation (https://github.com/ziglang/zig/blob/5b9b5e45cb710ddaad1a97813d1619755eb35a98/lib/std/io.zig#L610)
 // to work without a fifo
-fn poll(self: *Terminal, buf: []u8) !struct { bool, usize } {
+fn pollPosix(self: *Terminal, buf: []u8) !struct { bool, usize } {
     const err_mask = std.posix.POLL.ERR | std.posix.POLL.NVAL | std.posix.POLL.HUP;
 
     var temp = [_]std.posix.pollfd{.{
@@ -210,6 +210,25 @@ fn poll(self: *Terminal, buf: []u8) !struct { bool, usize } {
     }
 
     return .{ keep_polling, amt };
+}
+
+// This is a workaround while i cant think/find anything else
+fn pollWindows(self: *Terminal, buf: []u8) !struct { bool, usize } {
+    _ = buf;
+
+    while (true) {
+        var event_count: u32 = 0;
+        var input_record: Windows.INPUT_RECORD = undefined;
+        if (Windows.ReadConsoleInputW(self.stdin, &input_record, 1, &event_count) == 0)
+            return windows.unexpectedError(windows.kernel32.GetLastError());
+
+        switch (input_record.Event) {
+            0x0010 => {
+                return .{ bool, input_record.Event.KeyEvent.uChar.AsciiChar };
+            },
+            else => continue,
+        }
+    }
 }
 
 // Thanks to libvaxis
@@ -251,4 +270,52 @@ const Windows = struct {
         ENABLE_LVB_GRID_WORLDWIDE: u1 = 0,
         _: u27 = 0,
     };
+
+    // From gitub.com/ziglibs/zig-windows-console
+
+    const CHAR = extern union {
+        UnicodeChar: windows.WCHAR,
+        AsciiChar: windows.CHAR,
+    };
+    const KEY_EVENT_RECORD = extern struct {
+        bKeyDown: windows.BOOL,
+        wRepeatCount: windows.WORD,
+        wVirtualKeyCode: windows.WORD,
+        wVirtualScanCode: windows.WORD,
+        uChar: CHAR,
+        dwControlKeyState: windows.DWORD,
+    };
+
+    const MOUSE_EVENT_RECORD = extern struct {
+        dwMousePosition: windows.COORD,
+        dwButtonState: windows.DWORD,
+        dwControlKeyState: windows.DWORD,
+        dwEventFlags: windows.DWORD,
+    };
+
+    const WINDOW_BUFFER_SIZE_RECORD = extern struct {
+        dwSize: windows.COORD,
+    };
+
+    const MENU_EVENT_RECORD = extern struct {
+        dwCommandId: windows.UINT,
+    };
+
+    const FOCUS_EVENT_RECORD = extern struct {
+        bSetFocus: windows.BOOL,
+    };
+
+    const EVENT = extern union {
+        KeyEvent: KEY_EVENT_RECORD,
+        MouseEvent: MOUSE_EVENT_RECORD,
+        WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
+        MenuEvent: MENU_EVENT_RECORD,
+        FocusEvent: FOCUS_EVENT_RECORD,
+    };
+    const INPUT_RECORD = extern struct {
+        EventType: windows.WORD,
+        Event: EVENT,
+    };
+
+    pub extern "kernel32" fn ReadConsoleInputW(hConsoleInput: windows.HANDLE, lpBuffer: *INPUT_RECORD, nLength: windows.DWORD, lpNumberOfEventsRead: *windows.DWORD) callconv(windows.WINAPI) windows.BOOL;
 };
