@@ -143,8 +143,7 @@ pub fn deinit(self: Terminal) !void {
 /// 254 - Arrow Right (ESC C | ESC[C | ESC O C)
 /// 255 - Arrow Left (ESC D | ESC[D | ESC O D)
 pub fn readInput(self: *Terminal, buf: []u8) !u8 {
-    const is_ready, const bytes = try self.poll(buf);
-    if (!is_ready) return error.FailedToPoll;
+    const bytes = try self.poll(buf);
 
     if (bytes > 1) {
         if (buf[0] == std.ascii.control_code.esc) {
@@ -170,65 +169,13 @@ pub fn readInput(self: *Terminal, buf: []u8) !u8 {
     }
 }
 
-const poll = if (is_windows) pollWindows else pollPosix;
-
 // This is an adaptation of the std implementation (https://github.com/ziglang/zig/blob/5b9b5e45cb710ddaad1a97813d1619755eb35a98/lib/std/io.zig#L610)
 // to work without a fifo
-fn pollPosix(self: *Terminal, buf: []u8) !struct { bool, usize } {
-    const err_mask = std.posix.POLL.ERR | std.posix.POLL.NVAL | std.posix.POLL.HUP;
-
-    var temp = [_]std.posix.pollfd{.{
-        .fd = self.stdin.handle,
-        .events = std.posix.POLL.IN,
-        .revents = undefined,
-    }};
-
-    const events_len = try std.posix.poll(&temp, -1);
-
-    var poll_fd = temp[0];
-
-    if (events_len == 0) {
-        return .{ poll_fd.fd != -1, 0 };
-    }
-
-    var amt: usize = 0;
-    var keep_polling = false;
-    if (poll_fd.revents & std.posix.POLL.IN != 0) {
-        amt = std.posix.read(poll_fd.fd, buf) catch |err| switch (err) {
-            error.BrokenPipe => 0,
-            else => |e| return e,
-        };
-        if (amt == 0) {
-            poll_fd.fd = -1;
-        } else {
-            keep_polling = true;
-        }
-    } else if (poll_fd.revents & err_mask != 0) {
-        poll_fd.fd = -1;
-    } else if (poll_fd.fd != -1) {
-        keep_polling = true;
-    }
-
-    return .{ keep_polling, amt };
-}
-
-// This is a workaround while i cant think/find anything else
-fn pollWindows(self: *Terminal, buf: []u8) !struct { bool, usize } {
-    _ = buf;
-
-    while (true) {
-        var event_count: u32 = 0;
-        var input_record: Windows.INPUT_RECORD = undefined;
-        if (Windows.ReadConsoleInputW(self.stdin.handle, &input_record, 1, &event_count) == 0)
-            return windows.unexpectedError(windows.kernel32.GetLastError());
-
-        switch (input_record.EventType) {
-            0x0010 => {
-                return .{ true, input_record.Event.KeyEvent.uChar.AsciiChar };
-            },
-            else => continue,
-        }
-    }
+fn poll(self: *Terminal, buf: []u8) !usize {
+    return std.posix.read(self.stdin.handle, buf) catch |err| switch (err) {
+        error.BrokenPipe => 0,
+        else => |e| return e,
+    };
 }
 
 // Thanks to libvaxis
@@ -270,52 +217,4 @@ const Windows = struct {
         ENABLE_LVB_GRID_WORLDWIDE: u1 = 0,
         _: u27 = 0,
     };
-
-    // From gitub.com/ziglibs/zig-windows-console
-
-    const CHAR = extern union {
-        UnicodeChar: windows.WCHAR,
-        AsciiChar: windows.CHAR,
-    };
-    const KEY_EVENT_RECORD = extern struct {
-        bKeyDown: windows.BOOL,
-        wRepeatCount: windows.WORD,
-        wVirtualKeyCode: windows.WORD,
-        wVirtualScanCode: windows.WORD,
-        uChar: CHAR,
-        dwControlKeyState: windows.DWORD,
-    };
-
-    const MOUSE_EVENT_RECORD = extern struct {
-        dwMousePosition: windows.COORD,
-        dwButtonState: windows.DWORD,
-        dwControlKeyState: windows.DWORD,
-        dwEventFlags: windows.DWORD,
-    };
-
-    const WINDOW_BUFFER_SIZE_RECORD = extern struct {
-        dwSize: windows.COORD,
-    };
-
-    const MENU_EVENT_RECORD = extern struct {
-        dwCommandId: windows.UINT,
-    };
-
-    const FOCUS_EVENT_RECORD = extern struct {
-        bSetFocus: windows.BOOL,
-    };
-
-    const EVENT = extern union {
-        KeyEvent: KEY_EVENT_RECORD,
-        MouseEvent: MOUSE_EVENT_RECORD,
-        WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
-        MenuEvent: MENU_EVENT_RECORD,
-        FocusEvent: FOCUS_EVENT_RECORD,
-    };
-    const INPUT_RECORD = extern struct {
-        EventType: windows.WORD,
-        Event: EVENT,
-    };
-
-    pub extern "kernel32" fn ReadConsoleInputW(hConsoleInput: windows.HANDLE, lpBuffer: *INPUT_RECORD, nLength: windows.DWORD, lpNumberOfEventsRead: *windows.DWORD) callconv(windows.WINAPI) windows.BOOL;
 };
