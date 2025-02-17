@@ -16,8 +16,8 @@ const WindowsModes = struct {
 fd: if (is_windows) void else std.posix.fd_t,
 termios: if (is_windows) void else ?std.posix.termios,
 modes: if (is_windows) WindowsModes else void,
-stdout: std.fs.File = std.io.getStdOut(),
-stdin: std.fs.File = std.io.getStdIn(),
+stdout: std.fs.File,
+stdin: std.fs.File,
 
 pub fn init() !Terminal {
     return switch (builtin.os.tag) {
@@ -28,12 +28,16 @@ pub fn init() !Terminal {
                 .codepage = 0,
                 .input = .{},
                 .output = .{},
+                .stdout = std.io.getStdOut(),
+                .stdin = std.io.getStdIn(),
             },
         },
         else => .{
             .fd = try std.posix.open("/dev/tty", .{ .ACCMODE = .RDWR }, 0),
             .termios = null,
             .modes = {},
+            .stdout = std.io.getStdOut(),
+            .stdin = std.io.getStdIn(),
         },
     };
 }
