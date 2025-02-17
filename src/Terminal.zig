@@ -81,15 +81,8 @@ fn enableRawModeWindows(self: *Terminal) !void {
     const original_stdin = try Windows.getConsoleMode(self.stdin.handle);
     const original_stdout = try Windows.getConsoleMode(self.stdout.handle);
 
-    try Windows.setConsoleMode(self.stdin.handle, original_stdin | @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_INPUT{
-        .VIRTUAL_TERMINAL_INPUT = 1,
-        .EXTENDED_FLAGS = 1,
-    })));
-
-    try Windows.setConsoleMode(self.stdout.handle, original_stdout | @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_OUTPUT{
-        .PROCESSED_OUTPUT = 1,
-        .VIRTUAL_TERMINAL_PROCESSING = 1,
-    })));
+    try Windows.setConsoleMode(self.stdin.handle, original_stdin | Windows.ENABLE_VIRTUAL_TERMINAL_INPUT);
+    try Windows.setConsoleMode(self.stdout.handle, original_stdout | Windows.PROCESSED_OUTPUT | Windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
     if (windows.kernel32.SetConsoleOutputCP(65001) == 0)
         return windows.unexpectedError(windows.kernel32.GetLastError());
@@ -185,31 +178,18 @@ const Windows = struct {
         return @bitCast(mode);
     }
 
-    pub fn setConsoleMode(handle: windows.HANDLE, mode: windows.DWORD) !void {
+    fn setConsoleMode(handle: windows.HANDLE, mode: windows.DWORD) !void {
         if (windows.kernel32.SetConsoleMode(handle, mode) == 0) return switch (windows.kernel32.GetLastError()) {
             .INVALID_HANDLE => error.InvalidHandle,
             else => |e| windows.unexpectedError(e),
         };
     }
-    const CONSOLE_MODE_INPUT = packed struct(u32) {
-        PROCESSED_INPUT: u1 = 0,
-        LINE_INPUT: u1 = 0,
-        ECHO_INPUT: u1 = 0,
-        WINDOW_INPUT: u1 = 0,
-        MOUSE_INPUT: u1 = 0,
-        INSERT_MODE: u1 = 0,
-        QUICK_EDIT_MODE: u1 = 0,
-        EXTENDED_FLAGS: u1 = 0,
-        AUTO_POSITION: u1 = 0,
-        VIRTUAL_TERMINAL_INPUT: u1 = 0,
-        _: u22 = 0,
-    };
-    const CONSOLE_MODE_OUTPUT = packed struct(u32) {
-        PROCESSED_OUTPUT: u1 = 0,
-        WRAP_AT_EOL_OUTPUT: u1 = 0,
-        VIRTUAL_TERMINAL_PROCESSING: u1 = 0,
-        DISABLE_NEWLINE_AUTO_RETURN: u1 = 0,
-        ENABLE_LVB_GRID_WORLDWIDE: u1 = 0,
-        _: u27 = 0,
-    };
+
+    const ENABLE_PROCESSED_INPUT = 0x0001;
+    const ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200;
+
+    const PROCESSED_OUTPUT = 0x0001;
+    const ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002;
+    const ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004;
+    const DISABLE_NEWLINE_AUTO_RETURN = 0x0008;
 };
