@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Terminal = @import("./Terminal.zig");
 
 pub fn Prompt(comptime DT: type, comptime FT: type) type {
@@ -18,8 +19,11 @@ pub fn Prompt(comptime DT: type, comptime FT: type) type {
             var term = try Terminal.init();
             try term.enableRawMode();
 
-            try term.stdout.lock(.none);
-            defer term.stdout.unlock();
+            // TODO: Figure why this causes a crash in windows
+            if (comptime builtin.os.tag != .windows) {
+                try term.stdout.lock(.none);
+                defer term.stdout.unlock();
+            }
 
             const writer = term.stdout.writer();
 

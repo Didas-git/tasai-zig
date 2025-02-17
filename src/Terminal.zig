@@ -9,8 +9,8 @@ const Terminal = @This();
 
 const WindowsModes = struct {
     codepage: c_uint,
-    input: Windows.CONSOLE_MODE_INPUT,
-    output: Windows.CONSOLE_MODE_OUTPUT,
+    input: windows.DWORD,
+    output: windows.DWORD,
 };
 
 fd: if (is_windows) void else std.posix.fd_t,
@@ -26,8 +26,8 @@ pub fn init() !Terminal {
             .termios = {},
             .modes = .{
                 .codepage = 0,
-                .input = .{},
-                .output = .{},
+                .input = 0,
+                .output = 0,
             },
             .stdout = std.io.getStdOut(),
             .stdin = std.io.getStdIn(),
@@ -78,19 +78,18 @@ fn enableRawModePosix(self: *Terminal) !void {
 
 fn enableRawModeWindows(self: *Terminal) !void {
     const original_codepage = windows.kernel32.GetConsoleOutputCP();
-    const original_stdin = try Windows.getConsoleMode(Windows.CONSOLE_MODE_INPUT, self.stdin.handle);
-    const original_stdout = try Windows.getConsoleMode(Windows.CONSOLE_MODE_OUTPUT, self.stdout.handle);
+    const original_stdin = try Windows.getConsoleMode(self.stdin.handle);
+    const original_stdout = try Windows.getConsoleMode(self.stdout.handle);
 
-    try Windows.setConsoleMode(self.stdin.handle, Windows.CONSOLE_MODE_INPUT{
+    try Windows.setConsoleMode(self.stdin.handle, original_stdin | @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_INPUT{
+        .VIRTUAL_TERMINAL_INPUT = 1,
         .EXTENDED_FLAGS = 1,
-    });
+    })));
 
-    try Windows.setConsoleMode(self.stdout.handle, Windows.CONSOLE_MODE_OUTPUT{
+    try Windows.setConsoleMode(self.stdout.handle, @as(windows.DWORD, @bitCast(Windows.CONSOLE_MODE_OUTPUT{
         .PROCESSED_OUTPUT = 1,
         .VIRTUAL_TERMINAL_PROCESSING = 1,
-        .DISABLE_NEWLINE_AUTO_RETURN = 1,
-        .ENABLE_LVB_GRID_WORLDWIDE = 1,
-    });
+    })));
 
     if (windows.kernel32.SetConsoleOutputCP(65001) == 0)
         return windows.unexpectedError(windows.kernel32.GetLastError());
@@ -119,8 +118,6 @@ fn disableRawModeWindows(self: Terminal) !void {
     _ = windows.kernel32.SetConsoleOutputCP(self.modes.codepage);
     Windows.setConsoleMode(self.stdin.handle, self.modes.input) catch {};
     Windows.setConsoleMode(self.stdout.handle, self.modes.output) catch {};
-    windows.CloseHandle(self.stdin.handle);
-    windows.CloseHandle(self.stdout.handle);
 }
 
 pub fn disableRawMode(self: Terminal) !void {
@@ -143,7 +140,7 @@ pub fn deinit(self: Terminal) !void {
 /// 254 - Arrow Right (ESC C | ESC[C | ESC O C)
 /// 255 - Arrow Left (ESC D | ESC[D | ESC O D)
 pub fn readInput(self: *Terminal, buf: []u8) !u8 {
-    const bytes = try self.poll(buf);
+    const bytes = try self.read(buf);
 
     if (bytes > 1) {
         if (buf[0] == std.ascii.control_code.esc) {
@@ -169,9 +166,7 @@ pub fn readInput(self: *Terminal, buf: []u8) !u8 {
     }
 }
 
-// This is an adaptation of the std implementation (https://github.com/ziglang/zig/blob/5b9b5e45cb710ddaad1a97813d1619755eb35a98/lib/std/io.zig#L610)
-// to work without a fifo
-fn poll(self: *Terminal, buf: []u8) !usize {
+fn read(self: *Terminal, buf: []u8) !usize {
     return std.posix.read(self.stdin.handle, buf) catch |err| switch (err) {
         error.BrokenPipe => 0,
         else => |e| return e,
@@ -181,7 +176,7 @@ fn poll(self: *Terminal, buf: []u8) !usize {
 // Thanks to libvaxis
 // https://github.com/rockorager/libvaxis/blob/0eaf6226b2dd58720c5954d3646d6782e0c063f5/src/tty.zig#L281
 const Windows = struct {
-    fn getConsoleMode(comptime T: type, handle: windows.HANDLE) !T {
+    fn getConsoleMode(handle: windows.HANDLE) !windows.DWORD {
         var mode: u32 = undefined;
         if (windows.kernel32.GetConsoleMode(handle, &mode) == 0) return switch (windows.kernel32.GetLastError()) {
             .INVALID_HANDLE => error.InvalidHandle,
@@ -190,8 +185,8 @@ const Windows = struct {
         return @bitCast(mode);
     }
 
-    pub fn setConsoleMode(handle: windows.HANDLE, mode: anytype) !void {
-        if (windows.kernel32.SetConsoleMode(handle, @bitCast(mode)) == 0) return switch (windows.kernel32.GetLastError()) {
+    pub fn setConsoleMode(handle: windows.HANDLE, mode: windows.DWORD) !void {
+        if (windows.kernel32.SetConsoleMode(handle, mode) == 0) return switch (windows.kernel32.GetLastError()) {
             .INVALID_HANDLE => error.InvalidHandle,
             else => |e| windows.unexpectedError(e),
         };
