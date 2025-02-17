@@ -24,7 +24,11 @@ pub fn init() !Terminal {
         .windows => .{
             .fd = {},
             .termios = {},
-            .modes = null,
+            .modes = .{
+                .codepage = 0,
+                .input = 0,
+                .output = 0,
+            },
         },
         else => .{
             .fd = try std.posix.open("/dev/tty", .{ .ACCMODE = .RDWR }, 0),
