@@ -59,6 +59,8 @@ pub fn SelectPrompt(
         var i: usize = 0;
         var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
 
+        const limit = if (options.choices.len < options.limit) options.choices.len else options.limit - 1;
+
         pub const run = if (options.multiple) runWithAllocator else runWithoutAllocator;
 
         fn runWithoutAllocator() !ReturnType {
@@ -233,8 +235,7 @@ pub fn SelectPrompt(
         }
 
         fn clearChoices(term: *Terminal) !void {
-            const to_clear = if (comptime options.choices.len < options.limit) options.choices.len else options.limit - 1;
-            try term.stdout.writeAll(CSI.C_CPL(to_clear) ++ CSI.ED0);
+            try term.stdout.writeAll(CSI.C_CPL(limit) ++ CSI.ED0);
         }
 
         fn renderChoices(term: *Terminal) !void {
@@ -251,7 +252,7 @@ pub fn SelectPrompt(
                     try writer.print("  {s}", .{c});
                 }
 
-                if (x != options.limit - 1 + block_start) {
+                if (x != (limit + block_start)) {
                     try writer.writeAll(CSI.C_CNL(1));
                 }
             }

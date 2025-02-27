@@ -145,8 +145,8 @@ pub inline fn verboseFormat(comptime text: []const u8, comptime opening_modifier
         parseModifiers(&close, closing_modifiers);
 
         var temp: []const u8 = text;
-        if (open.len > 0) temp = FeEscapeSequence.CSI ++ open[0 .. open.len - 1] ++ @as([]const u8, &.{'m'}) ++ temp;
-        if (close.len > 0) temp = temp ++ FeEscapeSequence.CSI ++ close[0 .. close.len - 1] ++ @as([]const u8, &.{'m'});
+        if (open.len > 0) temp = FeEscapeSequence.CSI ++ open[0 .. open.len - 1] ++ &[_]u8{'m'} ++ temp;
+        if (close.len > 0) temp = temp ++ FeEscapeSequence.CSI ++ close[0 .. close.len - 1] ++ &[_]u8{'m'};
 
         return temp;
     }
@@ -282,14 +282,14 @@ pub fn Parser(comptime custom_tags: anytype) type {
                 while (i < text.len) : (i += 1) {
                     const char = text[i];
                     if (char != '<') {
-                        final_text = final_text ++ @as([]const u8, &.{char});
+                        final_text = final_text ++ &[_]u8{char};
                         previous_is_tag = false;
                         continue;
                     }
 
                     // If the user escaped the character then we don't read it as a token
                     if (i != 0 and text[i - 1] == '\\') {
-                        final_text = final_text[0 .. final_text.len - 1] ++ @as([]const u8, &.{char});
+                        final_text = final_text[0 .. final_text.len - 1] ++ &[_]u8{char};
                         previous_is_tag = false;
                         continue;
                     }
@@ -329,7 +329,7 @@ pub fn Parser(comptime custom_tags: anytype) type {
                             @compileError(fmt.comptimePrint("Invalid Tag: '{s}'.", .{tag}));
 
                         appendAttribute(&final_text, field[0], previous_is_tag);
-                        stack = stack ++ @as([]const Attribute, &.{field[1]});
+                        stack = stack ++ &[_]Attribute{field[1]};
                     }
 
                     previous_is_tag = true;
@@ -407,7 +407,7 @@ pub fn Parser(comptime custom_tags: anytype) type {
                 append24BitColor(buf, parseStringRGB(color_part), opening, trim_last_byte);
             }
 
-            stack.* = stack.* ++ @as([]const Attribute, &.{closing});
+            stack.* = stack.* ++ &[_]Attribute{closing};
         }
 
         fn append24BitColor(
@@ -454,7 +454,7 @@ pub fn Parser(comptime custom_tags: anytype) type {
 
             while (iterator.next()) |color_channel| {
                 const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));
-                pieces = pieces ++ @as([]const f64, &.{channel_code});
+                pieces = pieces ++ &[_]f64{channel_code};
             }
 
             if (pieces.len > 3) @compileError("Invalid color part");
