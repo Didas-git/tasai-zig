@@ -235,8 +235,8 @@ pub fn Parser(comptime custom_tags: anytype) type {
     if (@TypeOf(custom_tags) != void) {
         switch (@typeInfo(custom_tags)) {
             // TODO: improve validation of struct
-            .Struct => {},
-            .Void => {},
+            .@"struct" => {},
+            .void => {},
             else => @compileError(std.fmt.comptimePrint("Invalid type: expected 'struct' or 'void' got: {any}", .{@typeInfo((custom_tags))})),
         }
     }
@@ -450,7 +450,7 @@ pub fn Parser(comptime custom_tags: anytype) type {
 
         fn parseStringArbitraryColorSpace(color_part: []const u8) []const f64 {
             var pieces: []const f64 = &.{};
-            var iterator = mem.split(u8, color_part, ",");
+            var iterator = mem.splitScalar(u8, color_part, ',');
 
             while (iterator.next()) |color_channel| {
                 const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));

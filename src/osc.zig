@@ -8,8 +8,8 @@ pub inline fn hyperlink(comptime alt_text: []const u8, comptime link: []const u8
 
         const options_type = @typeInfo(@TypeOf(options));
         switch (options_type) {
-            .Null => {},
-            .Struct => |opt| for (opt.fields) |field| {
+            .null => {},
+            .@"struct" => |opt| for (opt.fields) |field| {
                 params = params ++ fmt.comptimePrint("{s}={any}:", .{ field.name, @field(options, field.name) });
             },
             else => @compileError("Options should be a struct."),

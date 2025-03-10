@@ -5,7 +5,7 @@ const Prompt = @import("../prompt.zig").Prompt;
 
 fn isKV(comptime T: type) bool {
     switch (@typeInfo(T)) {
-        .Struct => |s| {
+        .@"struct" => |s| {
             if (s.is_tuple) return false;
             if (s.fields.len != 2) return false;
             if (!std.mem.eql(u8, "name", s.fields[0].name)) return false;
@@ -47,7 +47,7 @@ pub fn SelectPrompt(
     });
 
     const V = @Vector(2, usize);
-    const _ReturnType = if (comptime isKV(T)) @typeInfo(T).Struct.fields[1].type else T;
+    const _ReturnType = if (comptime isKV(T)) @typeInfo(T).@"struct".fields[1].type else T;
     const ReturnType = if (comptime options.multiple) []_ReturnType else _ReturnType;
 
     return struct {

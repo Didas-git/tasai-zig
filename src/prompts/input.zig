@@ -8,11 +8,11 @@ const assert = std.debug.assert;
 inline fn typeToString(comptime T: type) []const u8 {
     comptime {
         return switch (@typeInfo(T)) {
-            .Int => |int| std.fmt.comptimePrint("{s}{d}", .{ switch (int.signedness) {
+            .int => |int| std.fmt.comptimePrint("{s}{d}", .{ switch (int.signedness) {
                 .unsigned => "u",
                 .signed => "i",
             }, int.bits }),
-            .Float => |flt| std.fmt.comptimePrint("f{d}", .{flt.bits}),
+            .float => |flt| std.fmt.comptimePrint("f{d}", .{flt.bits}),
             else => "default",
         };
     }
@@ -32,7 +32,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 }) type {
     assert(options.message.len > 0);
     assert(T == []const u8 or switch (@typeInfo(T)) {
-        .Int, .Float => true,
+        .int, .float => true,
         else => false,
     });
 
@@ -111,13 +111,13 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         // Only use for `int` and `float` checking
         fn validateInput(input: []const u8) bool {
             switch (comptime @typeInfo(T)) {
-                .Int => {
+                .int => {
                     _ = std.fmt.parseInt(T, input, 10) catch {
                         return false;
                     };
                     return true;
                 },
-                .Float => {
+                .float => {
                     _ = std.fmt.parseFloat(T, input) catch {
                         return false;
                     };
@@ -143,7 +143,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             }
 
             if (byte == std.ascii.control_code.del or byte == 177) {
-                if (self.array.popOrNull()) |_| {
+                if (self.array.pop()) |_| {
                     try term.stdout.writeAll(CSI.C_CUB(1) ++ CSI.EL0);
                 }
 
@@ -168,7 +168,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
             if (comptime T != []const u8) {
                 switch (comptime @typeInfo(T)) {
-                    .Int => {
+                    .int => {
                         switch (byte) {
                             '0'...'9' => {
                                 if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
@@ -178,7 +178,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                             else => return null,
                         }
                     },
-                    .Float => {
+                    .float => {
                         switch (byte) {
                             '.', '0'...'9' => {
                                 if (comptime !options.invisible) try term.stdout.writeAll(&.{byte});
@@ -218,7 +218,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 var final = std.ArrayList([]const u8).init(self.allocator);
                 defer final.deinit();
 
-                var iterator = std.mem.split(u8, answer, &.{options.list_separator});
+                var iterator = std.mem.splitScalar(u8, answer, options.list_separator);
                 while (iterator.next()) |part| {
                     const real_part = std.mem.trim(u8, part, " ");
                     if (real_part.len == 0) continue;
@@ -241,8 +241,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
-                    .Int => try std.fmt.parseInt(T, answer, 10),
-                    .Float => try std.fmt.parseFloat(T, answer),
+                    .int => try std.fmt.parseInt(T, answer, 10),
+                    .float => try std.fmt.parseFloat(T, answer),
                     else => unreachable,
                 };
 
