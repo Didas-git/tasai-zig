@@ -19,7 +19,6 @@ inline fn typeToString(comptime T: type) []const u8 {
 }
 
 pub fn InputPrompt(comptime T: type, comptime options: struct {
-    message: []const u8,
     header: [3][]const u8 = .{ "?", "\u{1f5f8}", "\u{2715}" },
     footer: [2][]const u8 = .{ "\u{25b8}", "\u{00b7}" },
     accept_empty: bool = false,
@@ -30,7 +29,6 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
     list: bool = false,
     list_separator: u8 = ',',
 }) type {
-    assert(options.message.len > 0);
     assert(T == []const u8 or switch (@typeInfo(T)) {
         .int, .float => true,
         else => false,
@@ -50,24 +48,13 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
     const ReturnType = if (comptime options.list) []T else T;
 
-    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r> " ++ if (options.password) CSI.SGR.Attribute.dim.str() else ""), .{
-        options.header[0],
-        options.message,
-        options.footer[0],
-    });
+    const asking_header = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> "), .{options.header[0]});
+    const done_header = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> "), .{options.header[1]});
 
-    const done = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
-        options.header[1],
-        options.message,
-        options.footer[1],
-    });
+    const asking_footer = std.fmt.comptimePrint(CSI.SGR.parseString(" <d>{s}<r> "), .{options.footer[0]});
+    const done_footer = std.fmt.comptimePrint(CSI.SGR.parseString(" <d>{s}<r> "), .{options.footer[1]});
 
-    const err_part_1 = std.fmt.comptimePrint(CSI.SGR.parseString("<f:red><b>{s}<r><r> {s} <d>{s}<r> "), .{
-        options.header[2],
-        options.message,
-        options.footer[0],
-    });
-
+    const error_header = std.fmt.comptimePrint(CSI.SGR.parseString("<f:red><b>{s}<r><r>"), .{options.header[2]});
     const err_part_2 = std.fmt.comptimePrint(CSI.SGR.parseString("<d>(Invalid input for type: {s})<r>"), .{typeToString(T)});
 
     return struct {
@@ -75,24 +62,27 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
         allocator: std.mem.Allocator,
         array: std.ArrayList(u8),
+        message: []const u8,
 
         var did_error: if (T == []const u8) void else bool = if (T == []const u8) {} else false;
 
-        pub fn run(allocator: std.mem.Allocator) !ReturnType {
+        pub fn init(allocator: std.mem.Allocator, message: []const u8) Self {
             const arr = std.ArrayList(u8).init(allocator);
-            defer arr.deinit();
 
-            var self: Self = .{
+            return .{
                 .allocator = allocator,
                 .array = arr,
+                .message = message,
             };
-            var p = prompt(&self);
-            return try p.run();
         }
 
-        fn prompt(self: *Self) Prompt([]const u8, ReturnType) {
+        pub fn deinit(self: *Self) void {
+            self.arr.deinit();
+        }
+
+        pub fn prompt(self: Self) Prompt([]const u8, ReturnType) {
             return .{
-                .ptr = self,
+                .ptr = @ptrCast(@constCast(&self)),
                 .vtable = &.{
                     .initialize = initialize,
                     .dispatch = dispatch,
@@ -102,10 +92,14 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
         }
 
         fn initialize(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) !void {
-            _ = ctx;
             _ = term;
 
-            try writer.writeAll((if (comptime options.hide_cursor) CSI.CUH else "") ++ ask);
+            const self: *Self = @ptrCast(@alignCast(ctx));
+
+            try writer.writeAll((if (comptime options.hide_cursor) CSI.CUH else ""));
+            try writer.writeAll(asking_header);
+            try writer.writeAll(self.message);
+            try writer.writeAll(asking_footer);
         }
 
         // Only use for `int` and `float` checking
@@ -136,8 +130,9 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             if (comptime T != []const u8) {
                 if (did_error) {
                     did_error = false;
-                    try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
-                    try writer.print(ask ++ "{s}", .{self.array.items});
+                    try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2 ++ asking_header);
+                    try writer.writeAll(self.message);
+                    try writer.print(asking_footer ++ "{s}", .{self.array.items});
                 }
             }
 
@@ -157,8 +152,9 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 if (comptime T != []const u8) {
                     if (!validateInput(self.array.items)) {
                         did_error = true;
-                        try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2);
-                        try writer.print(err_part_1 ++ "{s} " ++ err_part_2, .{self.array.items});
+                        try writer.writeAll(CSI.C_CHA(0) ++ CSI.EL2 ++ error_header);
+                        try writer.writeAll(self.message);
+                        try writer.print(asking_footer ++ "{s} " ++ err_part_2, .{self.array.items});
                         return null;
                     }
                 }
@@ -200,6 +196,12 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             return null;
         }
 
+        fn printDone(self: *Self, writer: std.fs.File.Writer) !void {
+            try writer.writeAll(done_header);
+            try writer.writeAll(self.message);
+            try writer.writeAll(done_footer);
+        }
+
         fn format(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: []const u8) !ReturnType {
             _ = term;
 
@@ -211,8 +213,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 for (answer) |_| {
                     try self.array.append(options.password_placeholder);
                 }
-
-                try writer.print(CSI.SGR.parseString(CSI.SGR.Attribute.not_bold_or_dim.str() ++ "{s}<f:cyan>{s}<r>\n"), .{ done, try self.array.toOwnedSlice() });
+                try printDone(self, writer);
+                try writer.print(CSI.SGR.parseString(CSI.SGR.Attribute.not_bold_or_dim.str() ++ "<f:cyan>{s}<r>\n"), .{try self.array.toOwnedSlice()});
             } else if (comptime options.list) {
                 var final = std.ArrayList([]const u8).init(self.allocator);
                 defer final.deinit();
@@ -236,7 +238,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
                 try self.array.appendSlice(CSI.SGR.Attribute.default_foreground_color.str());
 
-                try writer.print("{s}" ++ CSI.SGR.Attribute.foreground_cyan.str() ++ "{s}\n", .{ done, try self.array.toOwnedSlice() });
+                try printDone(self, writer);
+                try writer.print(CSI.SGR.Attribute.foreground_cyan.str() ++ "{s}\n", .{try self.array.toOwnedSlice()});
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
@@ -246,16 +249,20 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
                 };
 
                 if (comptime options.invisible) {
-                    try writer.writeAll(done ++ "\n");
+                    try printDone(self, writer);
+                    try writer.writeByte('\n');
                 } else {
-                    try writer.print(CSI.SGR.parseString("{s}<f:cyan>{d}<r>\n"), .{ done, num });
+                    try printDone(self, writer);
+                    try writer.print(CSI.SGR.parseString("<f:cyan>{d}<r>\n"), .{num});
                 }
 
                 return num;
             } else if (comptime options.invisible) {
-                try writer.writeAll(done ++ "\n");
+                try printDone(self, writer);
+                try writer.writeByte('\n');
             } else {
-                try writer.print(CSI.SGR.parseString("{s}<f:green>{s}<r>\n"), .{ done, answer });
+                try printDone(self, writer);
+                try writer.print(CSI.SGR.parseString("<f:green>{s}<r>\n"), .{answer});
             }
 
             return answer;

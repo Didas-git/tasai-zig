@@ -59,132 +59,123 @@ pub fn main() !void {
     const stdout = std.io.getStdOut();
     const writer = stdout.writer();
 
-    const c_p: ConfirmPrompt(.{}) = .{ .message = "Are you alive?" };
+    const c_p: ConfirmPrompt(.{}) = .init("Are you alive?");
     const answer1 = try c_p.prompt().run();
     try writer.print("Answer: {any}\n", .{answer1});
 
-    const c_p2: ConfirmPrompt(.{ .toggle = true }) = .{ .message = "Are you alive?" };
+    const c_p2: ConfirmPrompt(.{ .toggle = true }) = .init("Are you alive?");
     const answer9 = try c_p2.prompt().run();
     try writer.print("Answer: {any}\n", .{answer9});
 
-    const s_p = SelectPrompt([]const u8, .{
-        .message = "Pick",
-        .choices = &.{
-            "Almond",
-            "Apple",
-            "Banana",
-            "Blackberry",
-            "Blueberry",
-            "Cherry",
-            "Chocolate",
-            "Cinnamon",
-            "Coconut",
-            "Cranberry",
-            "Grape",
-            "Nougat",
-            "Orange",
-            "Pear",
-            "Pineapple",
-            "Raspberry",
-            "Strawberry",
-            "Vanilla",
-            "Watermelon",
-            "Wintergreen",
-        },
-    });
+    // const s_p = SelectPrompt([]const u8, .{
+    //     .message = "Pick",
+    //     .choices = &.{
+    //         "Almond",
+    //         "Apple",
+    //         "Banana",
+    //         "Blackberry",
+    //         "Blueberry",
+    //         "Cherry",
+    //         "Chocolate",
+    //         "Cinnamon",
+    //         "Coconut",
+    //         "Cranberry",
+    //         "Grape",
+    //         "Nougat",
+    //         "Orange",
+    //         "Pear",
+    //         "Pineapple",
+    //         "Raspberry",
+    //         "Strawberry",
+    //         "Vanilla",
+    //         "Watermelon",
+    //         "Wintergreen",
+    //     },
+    // });
 
-    const answer2 = try s_p.run();
-    try writer.print("Answer: {s}\n", .{answer2});
+    // const answer2 = try s_p.run();
+    // try writer.print("Answer: {s}\n", .{answer2});
 
-    const s_p4 = SelectPrompt([]const u8, .{
-        .message = "Pick",
-        .multiple = true,
-        .choices = &.{
-            "Almond",
-            "Apple",
-            "Banana",
-            "Blackberry",
-            "Blueberry",
-            "Cherry",
-            "Chocolate",
-            "Cinnamon",
-            "Coconut",
-            "Cranberry",
-            "Grape",
-            "Nougat",
-            "Orange",
-            "Pear",
-            "Pineapple",
-            "Raspberry",
-            "Strawberry",
-            "Vanilla",
-            "Watermelon",
-            "Wintergreen",
-        },
-    });
+    // const s_p4 = SelectPrompt([]const u8, .{
+    //     .message = "Pick",
+    //     .multiple = true,
+    //     .choices = &.{
+    //         "Almond",
+    //         "Apple",
+    //         "Banana",
+    //         "Blackberry",
+    //         "Blueberry",
+    //         "Cherry",
+    //         "Chocolate",
+    //         "Cinnamon",
+    //         "Coconut",
+    //         "Cranberry",
+    //         "Grape",
+    //         "Nougat",
+    //         "Orange",
+    //         "Pear",
+    //         "Pineapple",
+    //         "Raspberry",
+    //         "Strawberry",
+    //         "Vanilla",
+    //         "Watermelon",
+    //         "Wintergreen",
+    //     },
+    // });
 
-    const answer11 = try s_p4.run(allocator);
-    try writer.print("Answer: {s}\n", .{answer11});
+    // const answer11 = try s_p4.run(allocator);
+    // try writer.print("Answer: {s}\n", .{answer11});
 
-    const StringKV = KV([]const u8);
+    // const StringKV = KV([]const u8);
 
-    const s_p2 = SelectPrompt(StringKV, .{
-        .message = "Pick",
-        .choices = &.{
-            .{ .name = "Apple", .value = "I Love Apples" },
-            .{ .name = "Orange", .value = "I Love Oranges" },
-            .{ .name = "Grape", .value = "I Love Grapes" },
-        },
-    });
+    // const s_p2 = SelectPrompt(StringKV, .{
+    //     .message = "Pick",
+    //     .choices = &.{
+    //         .{ .name = "Apple", .value = "I Love Apples" },
+    //         .{ .name = "Orange", .value = "I Love Oranges" },
+    //         .{ .name = "Grape", .value = "I Love Grapes" },
+    //     },
+    // });
 
-    const answer3 = try s_p2.run();
-    try writer.print("Answer: {s}\n", .{answer3});
+    // const answer3 = try s_p2.run();
+    // try writer.print("Answer: {s}\n", .{answer3});
 
-    const BooleanKV = KV(bool);
+    // const BooleanKV = KV(bool);
 
-    const s_p3 = SelectPrompt(BooleanKV, .{
-        .message = "Pick",
-        .choices = &.{
-            .{ .name = "Apple", .value = false },
-            .{ .name = "Orange", .value = true },
-            .{ .name = "Grape", .value = false },
-        },
-    });
+    // const s_p3 = SelectPrompt(BooleanKV, .{
+    //     .message = "Pick",
+    //     .choices = &.{
+    //         .{ .name = "Apple", .value = false },
+    //         .{ .name = "Orange", .value = true },
+    //         .{ .name = "Grape", .value = false },
+    //     },
+    // });
 
-    const answer4 = try s_p3.run();
-    try writer.print("Answer: {any}\n", .{answer4});
+    // const answer4 = try s_p3.run();
+    // try writer.print("Answer: {any}\n", .{answer4});
 
-    const i_p = InputPrompt([]const u8, .{ .message = "What's your name?" });
+    const i_p: InputPrompt([]const u8, .{}) = .init(allocator, "What's your name?");
 
-    const answer5 = try i_p.run(allocator);
+    const answer5 = try i_p.prompt().run();
     try writer.print("Answer: {s}\n", .{answer5});
 
-    const i_p2 = InputPrompt([]const u8, .{
-        .message = "What's your password?",
-        .password = true,
-    });
+    const i_p2: InputPrompt([]const u8, .{ .password = true }) = .init(allocator, "What's your password?");
 
-    const answer6 = try i_p2.run(allocator);
+    const answer6 = try i_p2.prompt().run();
     try writer.print("Answer: {s}\n", .{answer6});
 
-    const i_p3 = InputPrompt(u8, .{ .message = "How old are you?" });
+    const i_p3: InputPrompt(u8, .{}) = .init(allocator, "How old are you?");
 
-    const answer7 = try i_p3.run(allocator);
+    const answer7 = try i_p3.prompt().run();
     try writer.print("Answer: {d}\n", .{answer7});
 
-    const i_p4 = InputPrompt(f32, .{
-        .message = "Give me a number",
-        .invisible = true,
-    });
+    const i_p4: InputPrompt(f32, .{ .invisible = true }) = .init(allocator, "Give me a number");
 
-    const answer8 = try i_p4.run(allocator);
+    const answer8 = try i_p4.prompt().run();
     try writer.print("Answer: {d}\n", .{answer8});
 
-    const i_p5 = InputPrompt([]const u8, .{
-        .message = "Give me a list",
-        .list = true,
-    });
+    const i_p5: InputPrompt([]const u8, .{ .list = true }) = .init(allocator, "Give me a list");
 
-    const answer10 = try i_p5.run(allocator);
+    const answer10 = try i_p5.prompt().run();
     try writer.print("Answer: {s}\n", .{answer10});
 }

@@ -38,7 +38,13 @@ pub fn ConfirmPrompt(comptime options: struct {
 
         var current: if (options.toggle) bool else void = if (options.toggle) false else {};
 
-        pub fn prompt(comptime self: Self) Prompt {
+        pub fn init(message: []const u8) Self {
+            return .{
+                .message = message,
+            };
+        }
+
+        pub fn prompt(self: Self) Prompt {
             return .{
                 .ptr = @ptrCast(@constCast(&self)),
                 .vtable = &.{
