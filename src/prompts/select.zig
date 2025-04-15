@@ -96,18 +96,22 @@ pub fn SelectPrompt(
         }
 
         fn initialize(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) !void {
+            _ = term;
+
             const self: *Self = @ptrCast(@alignCast(ctx));
 
             try writer.writeAll(CSI.CUH ++ ask ++ CSI.C_CNL(1));
 
             if (comptime options.multiple) {
-                try self.renderMultiple(term);
+                try self.renderMultiple(writer);
             } else {
-                try renderChoices(term);
+                try renderChoices(writer);
             }
         }
 
-        fn dispatchMultiple(ctx: *anyopaque, term: *Terminal, byte: u8) !?bool {
+        fn dispatchMultiple(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, byte: u8) !?bool {
+            _ = term;
+
             const self: *Self = @ptrCast(@alignCast(ctx));
 
             return switch (byte) {
@@ -122,70 +126,71 @@ pub fn SelectPrompt(
                     if (!self.selected_choices.remove(i)) {
                         try self.selected_choices.put(i, {});
                     }
-                    try clearChoices(term);
-                    try self.renderMultiple(term);
+                    try clearChoices(writer);
+                    try self.renderMultiple(writer);
 
                     return null;
                 },
                 252 => {
                     try move(-1);
-                    try clearChoices(term);
-                    try self.renderMultiple(term);
+                    try clearChoices(writer);
+                    try self.renderMultiple(writer);
                     return null;
                 },
                 253 => {
                     try move(1);
-                    try clearChoices(term);
-                    try self.renderMultiple(term);
+                    try clearChoices(writer);
+                    try self.renderMultiple(writer);
                     return null;
                 },
                 254 => {
                     i = options.choices.len - 1;
                     current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices(term);
-                    try self.renderMultiple(term);
+                    try clearChoices(writer);
+                    try self.renderMultiple(writer);
                     return null;
                 },
                 255 => {
                     i = 0;
                     current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices(term);
-                    try self.renderMultiple(term);
+                    try clearChoices(writer);
+                    try self.renderMultiple(writer);
                     return null;
                 },
                 else => null,
             };
         }
 
-        fn dispatchSingle(ctx: *anyopaque, term: *Terminal, byte: u8) !?T {
+        fn dispatchSingle(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, byte: u8) !?T {
             _ = ctx;
+            _ = term;
 
             return switch (byte) {
                 std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
                 252 => {
                     try move(-1);
-                    try clearChoices(term);
-                    try renderChoices(term);
+                    try clearChoices(writer);
+                    try renderChoices(writer);
                     return null;
                 },
                 253 => {
                     try move(1);
-                    try clearChoices(term);
-                    try renderChoices(term);
+                    try clearChoices(writer);
+                    try renderChoices(writer);
                     return null;
                 },
                 254 => {
                     i = options.choices.len - 1;
                     current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices(term);
-                    try renderChoices(term);
+                    try clearChoices(writer);
+                    try renderChoices(writer);
                     return null;
                 },
                 255 => {
                     i = 0;
                     current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices(term);
-                    try renderChoices(term);
+                    try clearChoices(writer);
+                    try renderChoices(writer);
                     return null;
                 },
                 else => null,
@@ -234,13 +239,12 @@ pub fn SelectPrompt(
             } else if (i + 1 > current_block[1]) current_block = current_block + @as(V, @splat(1));
         }
 
-        fn clearChoices(term: *Terminal) !void {
-            try term.stdout.writeAll(CSI.C_CPL(limit) ++ CSI.ED0);
+        fn clearChoices(writer: std.fs.File.Writer) !void {
+            try writer.writeAll(CSI.C_CPL(limit) ++ CSI.ED0);
         }
 
-        fn renderChoices(term: *Terminal) !void {
+        fn renderChoices(writer: std.fs.File.Writer) !void {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
-            const writer = term.stdout.writer();
 
             const block_start, const block_end = current_block;
 
@@ -258,11 +262,13 @@ pub fn SelectPrompt(
             }
         }
 
-        fn renderMultiple(self: *Self, term: *Terminal) !void {
+        fn renderMultiple(
+            self: *Self,
+            writer: std.fs.File.Writer,
+        ) !void {
             const green_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green>{s}<r>"), .{options.multiple_marker});
             const dim_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<d>{s}<r>"), .{options.multiple_marker});
             const selected = CSI.SGR.parseString("{s} <f:cyan><u>{s}<r><r>");
-            const writer = term.stdout.writer();
 
             const block_start, const block_end = current_block;
 

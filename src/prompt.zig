@@ -11,7 +11,7 @@ pub fn Prompt(comptime DT: type, comptime FT: type) type {
 
         const VTable = struct {
             initialize: *const fn (ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer) anyerror!void,
-            dispatch: *const fn (ctx: *anyopaque, term: *Terminal, byte: u8) anyerror!?DT,
+            dispatch: *const fn (ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, byte: u8) anyerror!?DT,
             format: *const fn (ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: DT) anyerror!FT,
         };
 
@@ -39,7 +39,7 @@ pub fn Prompt(comptime DT: type, comptime FT: type) type {
                         std.process.abort();
                     }
 
-                    if (try self.vtable.dispatch(self.ptr, &term, byte)) |val| {
+                    if (try self.vtable.dispatch(self.ptr, &term, writer, byte)) |val| {
                         break :blk val;
                     }
                     buf = undefined;

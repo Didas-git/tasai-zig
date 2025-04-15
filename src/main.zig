@@ -59,15 +59,12 @@ pub fn main() !void {
     const stdout = std.io.getStdOut();
     const writer = stdout.writer();
 
-    const c_p = ConfirmPrompt(.{ .message = "Are you alive?" });
-    const answer1 = try c_p.run();
+    const c_p: ConfirmPrompt(.{}) = .{ .message = "Are you alive?" };
+    const answer1 = try c_p.prompt().run();
     try writer.print("Answer: {any}\n", .{answer1});
 
-    const c_p2 = ConfirmPrompt(.{
-        .message = "Are you alive?",
-        .toggle = true,
-    });
-    const answer9 = try c_p2.run();
+    const c_p2: ConfirmPrompt(.{ .toggle = true }) = .{ .message = "Are you alive?" };
+    const answer9 = try c_p2.prompt().run();
     try writer.print("Answer: {any}\n", .{answer9});
 
     const s_p = SelectPrompt([]const u8, .{

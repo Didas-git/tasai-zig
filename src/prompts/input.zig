@@ -127,9 +127,8 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             }
         }
 
-        fn dispatch(ctx: *anyopaque, term: *Terminal, byte: u8) !?[]const u8 {
+        fn dispatch(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, byte: u8) !?[]const u8 {
             const self: *Self = @ptrCast(@alignCast(ctx));
-            const writer = term.stdout.writer();
 
             // Possible change:
             // Always reset the terminal with special case for passwords instead
