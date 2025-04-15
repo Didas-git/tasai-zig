@@ -67,92 +67,88 @@ pub fn main() !void {
     const answer9 = try c_p2.prompt().run();
     try writer.print("Answer: {any}\n", .{answer9});
 
-    // const s_p = SelectPrompt([]const u8, .{
-    //     .message = "Pick",
-    //     .choices = &.{
-    //         "Almond",
-    //         "Apple",
-    //         "Banana",
-    //         "Blackberry",
-    //         "Blueberry",
-    //         "Cherry",
-    //         "Chocolate",
-    //         "Cinnamon",
-    //         "Coconut",
-    //         "Cranberry",
-    //         "Grape",
-    //         "Nougat",
-    //         "Orange",
-    //         "Pear",
-    //         "Pineapple",
-    //         "Raspberry",
-    //         "Strawberry",
-    //         "Vanilla",
-    //         "Watermelon",
-    //         "Wintergreen",
-    //     },
-    // });
+    const s_p: SelectPrompt([]const u8, .{
+        .choices = &.{
+            "Almond",
+            "Apple",
+            "Banana",
+            "Blackberry",
+            "Blueberry",
+            "Cherry",
+            "Chocolate",
+            "Cinnamon",
+            "Coconut",
+            "Cranberry",
+            "Grape",
+            "Nougat",
+            "Orange",
+            "Pear",
+            "Pineapple",
+            "Raspberry",
+            "Strawberry",
+            "Vanilla",
+            "Watermelon",
+            "Wintergreen",
+        },
+    }) = .init("Pick");
 
-    // const answer2 = try s_p.run();
-    // try writer.print("Answer: {s}\n", .{answer2});
+    const answer2 = try s_p.prompt().run();
+    try writer.print("Answer: {s}\n", .{answer2});
 
-    // const s_p4 = SelectPrompt([]const u8, .{
-    //     .message = "Pick",
-    //     .multiple = true,
-    //     .choices = &.{
-    //         "Almond",
-    //         "Apple",
-    //         "Banana",
-    //         "Blackberry",
-    //         "Blueberry",
-    //         "Cherry",
-    //         "Chocolate",
-    //         "Cinnamon",
-    //         "Coconut",
-    //         "Cranberry",
-    //         "Grape",
-    //         "Nougat",
-    //         "Orange",
-    //         "Pear",
-    //         "Pineapple",
-    //         "Raspberry",
-    //         "Strawberry",
-    //         "Vanilla",
-    //         "Watermelon",
-    //         "Wintergreen",
-    //     },
-    // });
+    const s_p4: SelectPrompt([]const u8, .{
+        .multiple = true,
+        .choices = &.{
+            "Almond",
+            "Apple",
+            "Banana",
+            "Blackberry",
+            "Blueberry",
+            "Cherry",
+            "Chocolate",
+            "Cinnamon",
+            "Coconut",
+            "Cranberry",
+            "Grape",
+            "Nougat",
+            "Orange",
+            "Pear",
+            "Pineapple",
+            "Raspberry",
+            "Strawberry",
+            "Vanilla",
+            "Watermelon",
+            "Wintergreen",
+        },
+    }) = .init(allocator, "Pick");
 
-    // const answer11 = try s_p4.run(allocator);
-    // try writer.print("Answer: {s}\n", .{answer11});
+    const answer11 = try s_p4.prompt().run();
+    try writer.print("Answer: {s}\n", .{answer11});
 
-    // const StringKV = KV([]const u8);
+    const StringKV = KV([]const u8);
 
-    // const s_p2 = SelectPrompt(StringKV, .{
-    //     .message = "Pick",
-    //     .choices = &.{
-    //         .{ .name = "Apple", .value = "I Love Apples" },
-    //         .{ .name = "Orange", .value = "I Love Oranges" },
-    //         .{ .name = "Grape", .value = "I Love Grapes" },
-    //     },
-    // });
+    const s_p2: SelectPrompt(StringKV, .{
+        .choices = &.{
+            .{ .name = "Apple", .value = "I Love Apples" },
+            .{ .name = "Orange", .value = "I Love Oranges" },
+            .{ .name = "Grape", .value = "I Love Grapes" },
+        },
+    }) = .init("Pick");
 
-    // const answer3 = try s_p2.run();
-    // try writer.print("Answer: {s}\n", .{answer3});
+    const answer3 = try s_p2.prompt().run();
+    try writer.print("Answer: {s}\n", .{answer3});
 
-    // const BooleanKV = KV(bool);
+    const BooleanKV = KV(bool);
 
-    // const s_p3 = SelectPrompt(BooleanKV, .{
-    //     .message = "Pick",
-    //     .choices = &.{
-    //         .{ .name = "Apple", .value = false },
-    //         .{ .name = "Orange", .value = true },
-    //         .{ .name = "Grape", .value = false },
-    //     },
-    // });
+    const s_p3: SelectPrompt(BooleanKV, .{
+        .choices = &.{
+            .{ .name = "Apple", .value = false },
+            .{ .name = "Orange", .value = true },
+            .{ .name = "Grape", .value = false },
+        },
+    }) = .init("Pick");
 
-    // const answer4 = try s_p3.run();
-    // try writer.print("Answer: {any}\n", .{answer4});
+    const answer4 = try s_p3.prompt().run();
+    try writer.print("Answer: {any}\n", .{answer4});
 
     const i_p: InputPrompt([]const u8, .{}) = .init(allocator, "What's your name?");
 

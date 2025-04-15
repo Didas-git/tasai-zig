@@ -19,7 +19,6 @@ fn isKV(comptime T: type) bool {
 pub fn SelectPrompt(
     comptime T: type,
     comptime options: struct {
-        message: []const u8,
         choices: []const T,
         limit: u8 = 10,
         header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
@@ -30,21 +29,16 @@ pub fn SelectPrompt(
         multiple_marker: []const u8 = "\u{1f5f8}",
     },
 ) type {
-    std.debug.assert(options.message.len > 0);
-    std.debug.assert(options.choices.len > 0);
     std.debug.assert(options.limit > 1);
     std.debug.assert(T == []const u8 or isKV(T));
 
-    const ask = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> {s} <d>{s}<r>"), .{
-        options.header[0],
-        options.message,
-        options.footer[0],
-    });
-    const done = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> {s} <d>{s}<r> "), .{
-        options.header[1],
-        options.message,
-        options.footer[1],
-    });
+    const asking_header = std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan><b>{s}<r><r> "), .{options.header[0]});
+    const done_header = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green><b>{s}<r><r> "), .{options.header[1]});
+
+    const asking_footer = std.fmt.comptimePrint(CSI.SGR.parseString(" <d>{s}<r> "), .{options.footer[0]});
+    const done_footer = std.fmt.comptimePrint(CSI.SGR.parseString(" <d>{s}<r> "), .{options.footer[1]});
+
+    const answer_template = CSI.SGR.parseString("<f:cyan>{s}<r>\n");
 
     const V = @Vector(2, usize);
     const _ReturnType = if (comptime isKV(T)) @typeInfo(T).@"struct".fields[1].type else T;
@@ -55,38 +49,36 @@ pub fn SelectPrompt(
 
         allocator: if (options.multiple) std.mem.Allocator else void,
         selected_choices: if (options.multiple) std.AutoHashMap(usize, void) else void = if (options.multiple) undefined else {},
+        message: []const u8,
 
         var i: usize = 0;
         var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
 
         const limit = if (options.choices.len < options.limit) options.choices.len else options.limit - 1;
 
-        pub const run = if (options.multiple) runWithAllocator else runWithoutAllocator;
+        pub const init = if (options.multiple) initWithAllocator else initWithoutAllocator;
 
-        fn runWithoutAllocator() !ReturnType {
-            var self: Self = .{
+        fn initWithoutAllocator(message: []const u8) Self {
+            return .{
                 .allocator = {},
                 .selected_choices = {},
+                .message = message,
             };
-            var p = prompt(&self);
-            return try p.run();
         }
 
-        fn runWithAllocator(allocator: std.mem.Allocator) !ReturnType {
-            var hash_map = std.AutoHashMap(usize, void).init(allocator);
-            defer hash_map.deinit();
+        fn initWithAllocator(allocator: std.mem.Allocator, message: []const u8) Self {
+            const hash_map = std.AutoHashMap(usize, void).init(allocator);
 
-            var self: Self = .{
+            return .{
                 .allocator = allocator,
                 .selected_choices = hash_map,
+                .message = message,
             };
-            var p = prompt(&self);
-            return try p.run();
         }
 
-        fn prompt(self: *Self) Prompt(if (options.multiple) bool else T, ReturnType) {
+        pub fn prompt(self: Self) Prompt(if (options.multiple) bool else T, ReturnType) {
             return .{
-                .ptr = self,
+                .ptr = @ptrCast(@constCast(&self)),
                 .vtable = &.{
                     .initialize = initialize,
                     .dispatch = if (comptime options.multiple) dispatchMultiple else dispatchSingle,
@@ -100,7 +92,9 @@ pub fn SelectPrompt(
 
             const self: *Self = @ptrCast(@alignCast(ctx));
 
-            try writer.writeAll(CSI.CUH ++ ask ++ CSI.C_CNL(1));
+            try writer.writeAll(CSI.CUH ++ asking_header);
+            try writer.writeAll(self.message);
+            try writer.writeAll(asking_footer ++ CSI.C_CNL(1));
 
             if (comptime options.multiple) {
                 try self.renderMultiple(writer);
@@ -197,6 +191,12 @@ pub fn SelectPrompt(
             };
         }
 
+        fn printDone(self: *Self, writer: std.fs.File.Writer) !void {
+            try writer.writeAll(done_header);
+            try writer.writeAll(self.message);
+            try writer.writeAll(done_footer);
+        }
+
         fn format(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, answer: if (options.multiple) bool else T) !ReturnType {
             const self: *Self = @ptrCast(@alignCast(ctx));
 
@@ -210,6 +210,7 @@ pub fn SelectPrompt(
                 var array_to_return = std.ArrayList(_ReturnType).init(self.allocator);
                 defer array_to_print.deinit();
                 defer array_to_return.deinit();
+                defer self.selected_choices.deinit();
 
                 for (options.choices, 0..) |choice, x| {
                     if (self.selected_choices.contains(x)) {
@@ -218,13 +219,16 @@ pub fn SelectPrompt(
                     }
                 }
 
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, try array_to_print.toOwnedSlice() });
+                try printDone(self, writer);
+                try writer.print(answer_template, .{try array_to_print.toOwnedSlice()});
                 return try array_to_return.toOwnedSlice();
             } else if (comptime isKV(T)) {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer.name });
+                try printDone(self, writer);
+                try writer.print(answer_template, .{answer.name});
                 return answer.value;
             } else {
-                try writer.print(CSI.SGR.parseString("{s}<f:cyan>{s}<r>\n"), .{ done, answer });
+                try printDone(self, writer);
+                try writer.print(answer_template, .{answer});
                 return answer;
             }
         }
