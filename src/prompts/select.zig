@@ -19,7 +19,6 @@ fn isKV(comptime T: type) bool {
 pub fn SelectPrompt(
     comptime T: type,
     comptime options: struct {
-        choices: []const T,
         limit: u8 = 10,
         header: [2][]const u8 = .{ "?", "\u{1f5f8}" },
         footer: [2][]const u8 = .{ "...", "\u{00b7}" },
@@ -50,29 +49,34 @@ pub fn SelectPrompt(
         allocator: if (options.multiple) std.mem.Allocator else void,
         selected_choices: if (options.multiple) std.AutoHashMap(usize, void) else void = if (options.multiple) undefined else {},
         message: []const u8,
-
-        var i: usize = 0;
-        var current_block: V = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-
-        const limit = if (options.choices.len < options.limit) options.choices.len else options.limit - 1;
+        choices: []const T,
+        current_block: V,
+        limit: usize,
+        pos: usize = 0,
 
         pub const init = if (options.multiple) initWithAllocator else initWithoutAllocator;
 
-        fn initWithoutAllocator(message: []const u8) Self {
+        fn initWithoutAllocator(message: []const u8, choices: []const T) Self {
             return .{
                 .allocator = {},
                 .selected_choices = {},
                 .message = message,
+                .choices = choices,
+                .current_block = .{ 0, if (choices.len <= options.limit) choices.len else options.limit },
+                .limit = if (choices.len < options.limit) choices.len else options.limit - 1,
             };
         }
 
-        fn initWithAllocator(allocator: std.mem.Allocator, message: []const u8) Self {
+        fn initWithAllocator(allocator: std.mem.Allocator, message: []const u8, choices: []const T) Self {
             const hash_map = std.AutoHashMap(usize, void).init(allocator);
 
             return .{
                 .allocator = allocator,
                 .selected_choices = hash_map,
                 .message = message,
+                .choices = choices,
+                .current_block = .{ 0, if (choices.len <= options.limit) choices.len else options.limit },
+                .limit = if (choices.len < options.limit) choices.len else options.limit - 1,
             };
         }
 
@@ -99,7 +103,7 @@ pub fn SelectPrompt(
             if (comptime options.multiple) {
                 try self.renderMultiple(writer);
             } else {
-                try renderChoices(writer);
+                try self.renderChoices(writer);
             }
         }
 
@@ -117,37 +121,37 @@ pub fn SelectPrompt(
                     return true;
                 },
                 ' ' => {
-                    if (!self.selected_choices.remove(i)) {
-                        try self.selected_choices.put(i, {});
+                    if (!self.selected_choices.remove(self.pos)) {
+                        try self.selected_choices.put(self.pos, {});
                     }
-                    try clearChoices(writer);
+                    try self.clearChoices(writer);
                     try self.renderMultiple(writer);
 
                     return null;
                 },
                 252 => {
-                    try move(-1);
-                    try clearChoices(writer);
+                    try self.move(-1);
+                    try self.clearChoices(writer);
                     try self.renderMultiple(writer);
                     return null;
                 },
                 253 => {
-                    try move(1);
-                    try clearChoices(writer);
+                    try self.move(1);
+                    try self.clearChoices(writer);
                     try self.renderMultiple(writer);
                     return null;
                 },
                 254 => {
-                    i = options.choices.len - 1;
-                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices(writer);
+                    self.pos = self.choices.len - 1;
+                    self.current_block = .{ self.choices.len - (if (self.choices.len <= options.limit) self.choices.len else options.limit), self.choices.len };
+                    try self.clearChoices(writer);
                     try self.renderMultiple(writer);
                     return null;
                 },
                 255 => {
-                    i = 0;
-                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices(writer);
+                    self.pos = 0;
+                    self.current_block = .{ 0, if (self.choices.len <= options.limit) self.choices.len else options.limit };
+                    try self.clearChoices(writer);
                     try self.renderMultiple(writer);
                     return null;
                 },
@@ -156,35 +160,36 @@ pub fn SelectPrompt(
         }
 
         fn dispatchSingle(ctx: *anyopaque, term: *Terminal, writer: std.fs.File.Writer, byte: u8) !?T {
-            _ = ctx;
             _ = term;
 
+            const self: *Self = @ptrCast(@alignCast(ctx));
+
             return switch (byte) {
-                std.ascii.control_code.lf, std.ascii.control_code.cr => options.choices[i],
+                std.ascii.control_code.lf, std.ascii.control_code.cr => self.choices[self.pos],
                 252 => {
-                    try move(-1);
-                    try clearChoices(writer);
-                    try renderChoices(writer);
+                    try self.move(-1);
+                    try self.clearChoices(writer);
+                    try self.renderChoices(writer);
                     return null;
                 },
                 253 => {
-                    try move(1);
-                    try clearChoices(writer);
-                    try renderChoices(writer);
+                    try self.move(1);
+                    try self.clearChoices(writer);
+                    try self.renderChoices(writer);
                     return null;
                 },
                 254 => {
-                    i = options.choices.len - 1;
-                    current_block = .{ options.choices.len - (if (options.choices.len <= options.limit) options.choices.len else options.limit), options.choices.len };
-                    try clearChoices(writer);
-                    try renderChoices(writer);
+                    self.pos = self.choices.len - 1;
+                    self.current_block = .{ self.choices.len - (if (self.choices.len <= options.limit) self.choices.len else options.limit), self.choices.len };
+                    try self.clearChoices(writer);
+                    try self.renderChoices(writer);
                     return null;
                 },
                 255 => {
-                    i = 0;
-                    current_block = .{ 0, if (options.choices.len <= options.limit) options.choices.len else options.limit };
-                    try clearChoices(writer);
-                    try renderChoices(writer);
+                    self.pos = 0;
+                    self.current_block = .{ 0, if (self.choices.len <= options.limit) self.choices.len else options.limit };
+                    try self.clearChoices(writer);
+                    try self.renderChoices(writer);
                     return null;
                 },
                 else => null,
@@ -202,8 +207,10 @@ pub fn SelectPrompt(
 
             _ = term;
 
-            const to_clear = if (comptime options.choices.len < options.limit) options.choices.len + 1 else options.limit;
-            try writer.writeAll(CSI.C_CPL(to_clear) ++ CSI.ED0);
+            const to_clear = if (self.choices.len < options.limit) self.choices.len + 1 else options.limit;
+            var buf: [16]u8 = undefined;
+            try writer.writeAll(CSI.CPL(&buf, to_clear));
+            try writer.writeAll(CSI.ED0);
 
             if (comptime options.multiple) {
                 var array_to_print = std.ArrayList([]const u8).init(self.allocator);
@@ -212,7 +219,7 @@ pub fn SelectPrompt(
                 defer array_to_return.deinit();
                 defer self.selected_choices.deinit();
 
-                for (options.choices, 0..) |choice, x| {
+                for (self.choices, 0..) |choice, x| {
                     if (self.selected_choices.contains(x)) {
                         try array_to_print.append(if (comptime isKV(T)) choice.name else choice);
                         try array_to_return.append(if (comptime isKV(T)) choice.value else choice);
@@ -233,54 +240,53 @@ pub fn SelectPrompt(
             }
         }
 
-        fn move(x: isize) !void {
-            if (i == 0 and x == -1) return;
-            if (i == options.choices.len - 1 and x >= 1) return;
-            i = @intCast(@as(isize, @intCast(i)) + x);
+        fn move(self: *Self, x: isize) !void {
+            if (self.pos == 0 and x == -1) return;
+            if (self.pos == self.choices.len - 1 and x >= 1) return;
+            self.pos = @intCast(@as(isize, @intCast(self.pos)) + x);
 
-            if (i < current_block[0]) {
-                current_block = current_block - @as(V, @splat(1));
-            } else if (i + 1 > current_block[1]) current_block = current_block + @as(V, @splat(1));
+            if (self.pos < self.current_block[0]) {
+                self.current_block = self.current_block - @as(V, @splat(1));
+            } else if (self.pos + 1 > self.current_block[1]) self.current_block = self.current_block + @as(V, @splat(1));
         }
 
-        fn clearChoices(writer: std.fs.File.Writer) !void {
-            try writer.writeAll(CSI.C_CPL(limit) ++ CSI.ED0);
+        fn clearChoices(self: *Self, writer: std.fs.File.Writer) !void {
+            var buf: [16]u8 = undefined;
+            try writer.writeAll(CSI.CPL(&buf, self.limit));
+            try writer.writeAll(CSI.ED0);
         }
 
-        fn renderChoices(writer: std.fs.File.Writer) !void {
+        fn renderChoices(self: *Self, writer: std.fs.File.Writer) !void {
             const selected = comptime std.fmt.comptimePrint(CSI.SGR.parseString("<f:cyan>{s} <u>{s}<r><r>"), .{ options.arrow, "{s}" });
 
-            const block_start, const block_end = current_block;
+            const block_start, const block_end = self.current_block;
 
-            for (options.choices[block_start..block_end], block_start..) |choice, x| {
+            for (self.choices[block_start..block_end], block_start..) |choice, x| {
                 const c = if (comptime isKV(T)) choice.name else choice;
-                if (x == i) {
+                if (x == self.pos) {
                     try writer.print(selected, .{c});
                 } else {
                     try writer.print("  {s}", .{c});
                 }
 
-                if (x != (limit + block_start)) {
+                if (x != (self.limit + block_start)) {
                     try writer.writeAll(CSI.C_CNL(1));
                 }
             }
         }
 
-        fn renderMultiple(
-            self: *Self,
-            writer: std.fs.File.Writer,
-        ) !void {
+        fn renderMultiple(self: *Self, writer: std.fs.File.Writer) !void {
             const green_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<f:green>{s}<r>"), .{options.multiple_marker});
             const dim_marker = std.fmt.comptimePrint(CSI.SGR.parseString("<d>{s}<r>"), .{options.multiple_marker});
             const selected = CSI.SGR.parseString("{s} <f:cyan><u>{s}<r><r>");
 
-            const block_start, const block_end = current_block;
+            const block_start, const block_end = self.current_block;
 
-            for (options.choices[block_start..block_end], block_start..) |choice, x| {
+            for (self.choices[block_start..block_end], block_start..) |choice, x| {
                 const c = if (comptime isKV(T)) choice.name else choice;
                 const marker = if (self.selected_choices.contains(x)) green_marker else dim_marker;
 
-                if (x == i) {
+                if (x == self.pos) {
                     try writer.print(selected, .{ marker, c });
                 } else {
                     try writer.print("{s} {s}", .{ marker, c });
