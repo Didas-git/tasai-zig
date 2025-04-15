@@ -37,13 +37,13 @@ pub fn build(b: *std.Build) void {
     const check = b.step("check", "Check if foo compiles");
     check.dependOn(&exe_check.step);
 
-    // const tests = b.addTest(.{
-    //     .root_source_file = b.path("src/main.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
+    const export_test = b.addTest(.{
+        .root_source_file = b.path("src/tasai.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // const run_tests = b.addRunArtifact(tests);
-    // const test_step = b.step("test", "Run unit tests");
-    // test_step.dependOn(&run_tests.step);
+    const run_export_test = b.addRunArtifact(export_test);
+    const test_step = b.step("test", "Run unit tests on the exports");
+    test_step.dependOn(&run_export_test.step);
 }

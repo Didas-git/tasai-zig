@@ -1,7 +1,8 @@
 .{
-    .name = "tasai",
-    .version = "0.2.0",
-    .minimum_zig_version = "0.13.0",
+    .fingerprint = 0x57d574679b32bfad,
+    .name = .tasai,
+    .version = "0.3.0",
+    .minimum_zig_version = "0.14.0",
     .paths = .{
         "build.zig",
         "build.zig.zon",
