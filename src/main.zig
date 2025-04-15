@@ -59,15 +59,15 @@ pub fn main() !void {
     const stdout = std.io.getStdOut();
     const writer = stdout.writer();
 
-    const c_p: ConfirmPrompt(.{}) = .init("Are you alive?");
+    var c_p: ConfirmPrompt(.{}) = .init("Are you alive?");
     const answer1 = try c_p.prompt().run();
     try writer.print("Answer: {any}\n", .{answer1});
 
-    const c_p2: ConfirmPrompt(.{ .toggle = true }) = .init("Are you alive?");
+    var c_p2: ConfirmPrompt(.{ .toggle = true }) = .init("Are you alive?");
     const answer9 = try c_p2.prompt().run();
     try writer.print("Answer: {any}\n", .{answer9});
 
-    const s_p: SelectPrompt([]const u8, .{
+    var s_p: SelectPrompt([]const u8, .{
         .choices = &.{
             "Almond",
             "Apple",
@@ -95,7 +95,7 @@ pub fn main() !void {
     const answer2 = try s_p.prompt().run();
     try writer.print("Answer: {s}\n", .{answer2});
 
-    const s_p4: SelectPrompt([]const u8, .{
+    var s_p4: SelectPrompt([]const u8, .{
         .multiple = true,
         .choices = &.{
             "Almond",
@@ -126,7 +126,7 @@ pub fn main() !void {
 
     const StringKV = KV([]const u8);
 
-    const s_p2: SelectPrompt(StringKV, .{
+    var s_p2: SelectPrompt(StringKV, .{
         .choices = &.{
             .{ .name = "Apple", .value = "I Love Apples" },
             .{ .name = "Orange", .value = "I Love Oranges" },
@@ -139,7 +139,7 @@ pub fn main() !void {
 
     const BooleanKV = KV(bool);
 
-    const s_p3: SelectPrompt(BooleanKV, .{
+    var s_p3: SelectPrompt(BooleanKV, .{
         .choices = &.{
             .{ .name = "Apple", .value = false },
             .{ .name = "Orange", .value = true },
@@ -150,27 +150,27 @@ pub fn main() !void {
     const answer4 = try s_p3.prompt().run();
     try writer.print("Answer: {any}\n", .{answer4});
 
-    const i_p: InputPrompt([]const u8, .{}) = .init(allocator, "What's your name?");
+    var i_p: InputPrompt([]const u8, .{}) = .init(allocator, "What's your name?");
 
     const answer5 = try i_p.prompt().run();
     try writer.print("Answer: {s}\n", .{answer5});
 
-    const i_p2: InputPrompt([]const u8, .{ .password = true }) = .init(allocator, "What's your password?");
+    var i_p2: InputPrompt([]const u8, .{ .password = true }) = .init(allocator, "What's your password?");
 
     const answer6 = try i_p2.prompt().run();
     try writer.print("Answer: {s}\n", .{answer6});
 
-    const i_p3: InputPrompt(u8, .{}) = .init(allocator, "How old are you?");
+    var i_p3: InputPrompt(u8, .{}) = .init(allocator, "How old are you?");
 
     const answer7 = try i_p3.prompt().run();
     try writer.print("Answer: {d}\n", .{answer7});
 
-    const i_p4: InputPrompt(f32, .{ .invisible = true }) = .init(allocator, "Give me a number");
+    var i_p4: InputPrompt(f32, .{ .invisible = true }) = .init(allocator, "Give me a number");
 
     const answer8 = try i_p4.prompt().run();
     try writer.print("Answer: {d}\n", .{answer8});
 
-    const i_p5: InputPrompt([]const u8, .{ .list = true }) = .init(allocator, "Give me a list");
+    var i_p5: InputPrompt([]const u8, .{ .list = true }) = .init(allocator, "Give me a list");
 
     const answer10 = try i_p5.prompt().run();
     try writer.print("Answer: {s}\n", .{answer10});

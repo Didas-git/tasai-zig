@@ -76,9 +76,9 @@ pub fn SelectPrompt(
             };
         }
 
-        pub fn prompt(self: Self) Prompt(if (options.multiple) bool else T, ReturnType) {
+        pub fn prompt(self: *Self) Prompt(if (options.multiple) bool else T, ReturnType) {
             return .{
-                .ptr = @ptrCast(@constCast(&self)),
+                .ptr = self,
                 .vtable = &.{
                     .initialize = initialize,
                     .dispatch = if (comptime options.multiple) dispatchMultiple else dispatchSingle,

@@ -44,9 +44,9 @@ pub fn ConfirmPrompt(comptime options: struct {
             };
         }
 
-        pub fn prompt(self: Self) Prompt {
+        pub fn prompt(self: *Self) Prompt {
             return .{
-                .ptr = @ptrCast(@constCast(&self)),
+                .ptr = self,
                 .vtable = &.{
                     .initialize = initialize,
                     .dispatch = dispatch,

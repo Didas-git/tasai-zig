@@ -76,9 +76,9 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             };
         }
 
-        pub fn prompt(self: Self) Prompt([]const u8, ReturnType) {
+        pub fn prompt(self: *Self) Prompt([]const u8, ReturnType) {
             return .{
-                .ptr = @ptrCast(@constCast(&self)),
+                .ptr = self,
                 .vtable = &.{
                     .initialize = initialize,
                     .dispatch = dispatch,
