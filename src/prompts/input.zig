@@ -76,10 +76,6 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
             };
         }
 
-        pub fn deinit(self: *Self) void {
-            self.arr.deinit();
-        }
-
         pub fn prompt(self: Self) Prompt([]const u8, ReturnType) {
             return .{
                 .ptr = @ptrCast(@constCast(&self)),
@@ -240,6 +236,7 @@ pub fn InputPrompt(comptime T: type, comptime options: struct {
 
                 try printDone(self, writer);
                 try writer.print(CSI.SGR.Attribute.foreground_cyan.str() ++ "{s}\n", .{try self.array.toOwnedSlice()});
+                self.array.deinit();
                 return try final.toOwnedSlice();
             } else if (comptime T != []const u8) {
                 const num = switch (comptime @typeInfo(T)) {
