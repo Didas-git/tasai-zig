@@ -433,7 +433,7 @@ fn parseStringRGB(
 
 fn parseStringArbitraryColorSpace(color_part: []const u8) []const f64 {
     var pieces: []const f64 = &.{};
-    var iterator = mem.split(u8, color_part, ",");
+    var iterator = mem.splitScalar(u8, color_part, ',');
 
     while (iterator.next()) |color_channel| {
         const channel_code = fmt.parseFloat(f64, color_channel) catch @compileError(fmt.comptimePrint("Failed to parse color: '{s}'", .{color_channel}));
